@@ -1,0 +1,73 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-night: #0b0f0e;
+  --color-moss: #121a17;
+  --color-stone-card: #182420;
+  --color-mist: #9db4a8;
+  --color-bone: #e8f0ea;
+  --color-mint: #34d399;
+  --color-gold: #f2c14e;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: radial-gradient(ellipse at 50% 0%, #111a16 0%, #0b0f0e 55%, #060908 100%);
+  color: #e8f0ea;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+::selection { background: #34d399; color: #0b0f0e; }
+
+/* Custom sleek dark scrollbar */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #0b0f0e; }
+::-webkit-scrollbar-thumb { background: #26332d; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #34d399; }
+
+.font-display { font-family: var(--font-display); }
+
+/* Tombstone card: arched top, stone gradient, engraved feel */
+.tombstone {
+  border-radius: 999px 999px 20px 20px;
+  background: linear-gradient(180deg, #1d2b25 0%, #182420 55%, #141d19 100%);
+  box-shadow: inset 0 1px 0 rgba(232,240,234,.07), inset 0 -12px 24px rgba(0,0,0,.35);
+}
+.grave-glow:hover {
+  box-shadow: inset 0 1px 0 rgba(232,240,234,.12), 0 0 0 1px rgba(52,211,153,.45), 0 22px 55px -18px rgba(52,211,153,.35);
+}
+
+/* Shimmer CTA — 21st.dev style */
+.shimmer-btn { position: relative; overflow: hidden; isolation: isolate; }
+.shimmer-btn::after {
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
+  transform: translateX(-120%); animation: shimmer 2.8s ease-in-out infinite;
+}
+@keyframes shimmer { 0%, 55% { transform: translateX(-120%);} 85%, 100% { transform: translateX(120%);} }
+
+/* Twinkling starfield */
+@keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
+.star { position: absolute; border-radius: 999px; background: #e8f0ea; animation: twinkle var(--tw, 3s) ease-in-out infinite; }
+
+/* Moon */
+.moon {
+  background: radial-gradient(circle at 38% 35%, #fdf6d8 0%, #f2e3ac 45%, #d9c078 100%);
+  box-shadow: 0 0 60px 18px rgba(242,225,172,.28), 0 0 140px 60px rgba(242,225,172,.12);
+}
+
+/* Ground fog drifting over the graveyard hill */
+@keyframes fogdrift { 0% { transform: translateX(-4%);} 100% { transform: translateX(4%);} }
+.fog { animation: fogdrift 9s ease-in-out infinite alternate; filter: blur(18px); }
+
+input, textarea, select { outline: none; }
+input:focus, textarea:focus, select:focus { border-color: #34d399 !important; }
+button:focus-visible, a:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-btn::after, .fog, .star { animation: none !important; }
+}

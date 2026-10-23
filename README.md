@@ -2,10 +2,19 @@
 
 **Every unfinished project deserves a second chance.**
 
-A digital afterlife for abandoned software — built for **Baloon National Hackathon 2026, Round 2** by **Manthan Rajpurohit** (Team: Straw hat pirate), continuing the Round 1 entry *PS 05 — The Project Graveyard*.
+A digital afterlife for abandoned software — built for **Baloon National Hackathon 2026, Round 2** by **Manthan Rajpurohit** (Team: Straw hat pirate),<br>
+continuing the Round 1 entry *PS 05 — The Project Graveyard*.
 
 > *"Projects rest at night, they rise at dawn."*
 > Built with a serene, print-inspired **Dawn Theme** — warm ivory `#FAF6EE`, crisp cards with hairline borders `#E5DECD`, Apple-grade spring micro-interactions, Fraunces serif headlines, and gold & emerald accents. Respectful and calm: no roasts, no horror, no jokes about failure.
+
+---
+
+## Preview
+
+<p align="center">
+  <img src="docs/banner.jpg" alt="The Project Graveyard — Where good projects rest until they rise again" width="100%" />
+</p>
 
 ---
 
@@ -17,9 +26,11 @@ A digital afterlife for abandoned software — built for **Baloon National Hacka
 
 ---
 
-## Preview
+## How It Works
 
-![The Project Graveyard — Dawn Digital Afterlife](/og.png)
+Bury → Autopsy → Resurrection Score → Choose Fate → Revival Plan → Revived
+
+Alternative outcomes: Choose Archive to preserve a project, or mark it adoptable through Adopt-a-Grave so another builder can continue it.
 
 ---
 
@@ -116,13 +127,13 @@ Follow this exact walkthrough during judging:
 | **Animation** | Framer Motion 14 | Spring physics, fluid dialog entries, reduced-motion overrides |
 | **Icons** | Lucide React | Minimalist line icons |
 | **Image Generation** | html-to-image (lazy-loaded) | High-fidelity 1200×630 social tombstone graphics |
-| **Testing** | Node.js Test Runner (`node --test`) | Zero-dependency, ultra-fast test suite (20/20 pass) |
+| **Testing** | Node.js Test Runner (`node --test`) | Zero-dependency, ultra-fast test suite (21/21 pass) |
 | **Linter** | Oxlint | High-speed Rust-based linting (0 warnings, 0 errors) |
 
 ### Validation Commands
 
 ```bash
-npm test          # 20 automated unit tests (score, utils, storage migrations)
+npm test          # 21 automated unit tests (score, utils, storage migrations)
 npm run lint      # oxlint static analysis (0 warnings, 0 errors)
 npm run build     # production build → dist/
 ```

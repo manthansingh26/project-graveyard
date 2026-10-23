@@ -1527,7 +1527,7 @@ function TagFilterBar({ tags, selectedTag, onSelectTag, projectsCount }) {
   if (!tags || tags.length === 0) return null
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs max-w-full w-full">
       <span className="text-[#4D5E53] font-semibold text-[11px] mr-1 shrink-0">Tags:</span>
       <button
         onClick={() => onSelectTag('All')}
@@ -2602,21 +2602,21 @@ export function AppContent() {
   }
 
   return (
-    <div className="min-h-screen text-[#1F2A24]">
+    <div className="min-h-screen text-[#1F2A24] max-w-full overflow-x-hidden">
       {/* Sticky Header */}
-      <nav className="sticky top-0 z-40 backdrop-blur-md bg-[#FAF6EE]/90 border-b border-[#E5DECD]">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <span className="text-xl">🪦</span>
-            <span className="font-display font-black text-lg text-[#1F2A24] tracking-tight">
+      <nav className="sticky top-0 z-40 backdrop-blur-md bg-[#FAF6EE]/90 border-b border-[#E5DECD] w-full">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink min-w-0">
+            <span className="text-lg sm:text-xl shrink-0">🪦</span>
+            <span className="font-display font-black text-sm xs:text-base sm:text-lg text-[#1F2A24] tracking-tight truncate">
               The Project Graveyard
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={promptResetDemo}
-              className="border border-[#E5DECD] bg-white px-3.5 py-1.5 rounded-full text-xs font-medium text-[#4D5E53] hover:text-[#7D2D20] hover:bg-[#FDF2F0] cursor-pointer transition-colors"
+              className="border border-[#E5DECD] bg-white px-2.5 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-medium text-[#4D5E53] hover:text-[#7D2D20] hover:bg-[#FDF2F0] cursor-pointer transition-colors whitespace-nowrap"
             >
               Reset demo
             </button>
@@ -2636,7 +2636,7 @@ export function AppContent() {
 
             <button
               onClick={() => setShowBury(true)}
-              className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer shadow-xs flex items-center gap-1.5 transition-all"
+              className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm cursor-pointer shadow-xs flex items-center gap-1.5 transition-all whitespace-nowrap"
             >
               <span>+</span>
               <span>Bury a project</span>

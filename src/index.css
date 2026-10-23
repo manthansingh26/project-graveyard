@@ -22,6 +22,8 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 body {
@@ -33,6 +35,7 @@ body {
   color: #1F2A24;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  max-width: 100vw;
   min-height: 100vh;
   font-size: 14px;
 }

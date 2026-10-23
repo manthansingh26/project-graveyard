@@ -2840,7 +2840,7 @@ export function AppContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search projects..."
-            className="w-full bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] placeholder-[#4D5E53] pr-12 card-shadow"
+            className="w-full min-h-[44px] bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] placeholder-[#4D5E53] pr-12 card-shadow"
           />
           <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
             <kbd className="text-[10px] bg-[#F3EEE2] border border-[#E5DECD] px-1.5 py-0.5 rounded text-[#4D5E53] font-mono">
@@ -2852,7 +2852,7 @@ export function AppContent() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
+          className="min-h-[44px] bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
         >
           {['All', 'Dormant', 'Resurrected', 'Revived', 'Adopted', 'Archived', 'Adoptable'].map((s) => (
             <option key={s} value={s}>{s === 'Revived' ? 'Revived ✓' : s}</option>
@@ -2862,7 +2862,7 @@ export function AppContent() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          className="bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
+          className="min-h-[44px] bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
         >
           <option value="score">Sort: Highest score</option>
           <option value="recent">Sort: Recently buried</option>

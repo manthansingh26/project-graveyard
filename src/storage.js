@@ -1,5 +1,5 @@
 // Versioned storage service for The Project Graveyard
-// Supports wrapped schema { version: 1, projects: [...] } with silent migration from old raw arrays.
+// Supports wrapped schema { version: 2, projects: [...] } with automatic migration from v0 raw arrays and v1 schemas.
 
 export const STORAGE_KEY = 'project-graveyard-v1'
 export const SCHEMA_VERSION = 2

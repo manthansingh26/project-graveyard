@@ -1049,7 +1049,7 @@ function AutopsyView({
               }}
             >
               <span>{project.completeness}% built • Dormant {project.monthsDormant} months</span>
-              <span style={{ fontWeight: 700, color: '#8A6414' }}>https://project-graveyard.vercel.app</span>
+              <span style={{ fontWeight: 700, color: '#8A6414' }}>https://project-graveyard-woad.vercel.app</span>
             </div>
           </div>
         </div>

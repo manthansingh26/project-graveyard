@@ -9,7 +9,7 @@ import {
   FileText,
   Compass,
   Sparkles,
-  Share2,
+  Download,
   Check,
   Zap,
 } from 'lucide-react'
@@ -23,31 +23,13 @@ import {
   buildRevivalPlan,
   calculateGraveyardInsights,
   mergeActivityFeed,
+  buildRevivalPrompt,
 } from './utils.js'
 import { loadProjects, saveProjects, clearProjects } from './storage.js'
 
 const now = () => new Date().toISOString().slice(0, 10)
 
 const SEED = [
-  {
-    id: 'pulsenote',
-    title: 'PulseNote — Study Audio',
-    epitaph: 'Built in 36h for a campus sprint; paused at timestamp sync.',
-    vision: 'Turn long lecture recordings into searchable, timestamped study notes for students who revise at 2x speed.',
-    built: ['WebAudio recorder + tag UI', 'Lecture upload flow', 'Tag timeline'],
-    unfinished: ['Transcript search & export', 'Timestamp sync with playback'],
-    reason: 'Semester final exams began the day after demo day.',
-    tags: ['React', 'WebAudio', 'EdTech'],
-    completeness: 80,
-    ideaStrength: 92,
-    monthsDormant: 6,
-    status: 'Dormant',
-    adoptable: true,
-    adoptedBy: '',
-    createdAt: '2026-04-12',
-    log: [{ date: '2026-04-12', text: 'Buried with a full autopsy.' }],
-    revivalPlan: null,
-  },
   {
     id: 'shadercanvas',
     title: 'ShaderCanvas Studio',
@@ -61,10 +43,33 @@ const SEED = [
     ideaStrength: 92,
     monthsDormant: 7,
     status: 'Dormant',
+    currentFate: '',
     adoptable: false,
     adoptedBy: '',
+    adopter: null,
     createdAt: '2026-03-05',
     log: [{ date: '2026-03-05', text: 'Buried with a full autopsy.' }],
+    revivalPlan: null,
+  },
+  {
+    id: 'pulsenote',
+    title: 'PulseNote — Study Audio',
+    epitaph: 'Built in 36h for a campus sprint; paused at timestamp sync.',
+    vision: 'Turn long lecture recordings into searchable, timestamped study notes for students who revise at 2x speed.',
+    built: ['WebAudio recorder + tag UI', 'Lecture upload flow', 'Tag timeline'],
+    unfinished: ['Transcript search & export', 'Timestamp sync with playback'],
+    reason: 'Semester final exams began the day after demo day.',
+    tags: ['React', 'WebAudio', 'EdTech'],
+    completeness: 80,
+    ideaStrength: 92,
+    monthsDormant: 6,
+    status: 'Dormant',
+    currentFate: '',
+    adoptable: true,
+    adoptedBy: '',
+    adopter: null,
+    createdAt: '2026-04-12',
+    log: [{ date: '2026-04-12', text: 'Buried with a full autopsy.' }],
     revivalPlan: null,
   },
   {
@@ -80,8 +85,10 @@ const SEED = [
     ideaStrength: 78,
     monthsDormant: 14,
     status: 'Dormant',
+    currentFate: '',
     adoptable: true,
     adoptedBy: '',
+    adopter: null,
     createdAt: '2025-08-20',
     log: [{ date: '2025-08-20', text: 'Buried with a full autopsy.' }],
     revivalPlan: null,
@@ -202,6 +209,14 @@ function TombstoneCard({ project, onOpen }) {
               Adoptable
             </span>
           )}
+          {project.status === 'Adopted' && (
+            <span
+              className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F7ECD2] text-[#8A6414] truncate max-w-[210px]"
+              title={`Adopted by ${project.adopter?.name || project.adoptedBy || 'Builder'}`}
+            >
+              Adopted by {project.adopter?.name || project.adoptedBy || 'Builder'}
+            </span>
+          )}
           {project.tags.map((t) => (
             <span
               key={t}
@@ -227,7 +242,7 @@ function TombstoneCard({ project, onOpen }) {
           <span className="font-semibold text-[#16A06B] hover:underline">View autopsy →</span>
         </div>
 
-        {/* Dedicated slot for revival plan progress inside footer */}
+        {/* Dedicated slot for revival plan / adopter progress inside footer */}
         <div className="h-8 mt-2 flex items-center">
           {plan.total > 0 ? (
             <div className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
@@ -248,6 +263,10 @@ function TombstoneCard({ project, onOpen }) {
                 {plan.completed}/{plan.total} ({plan.percent}%)
               </span>
             </div>
+          ) : project.status === 'Adopted' && project.adopter?.plan ? (
+            <div className="w-full bg-[#FAF6EE] border border-[#E5C98A] rounded-lg px-2.5 py-1 text-[11px] text-[#8A6414] truncate" title={project.adopter.plan}>
+              <span className="font-bold">Plan:</span> “{project.adopter.plan}”
+            </div>
           ) : (
             <div className="text-[11px] text-[#8A9A8E] italic">
               Tap card to inspect vision & reasons
@@ -259,7 +278,7 @@ function TombstoneCard({ project, onOpen }) {
   )
 }
 
-function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
+function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan, onCopyPrompt }) {
   const plan = project.revivalPlan
   const progress = calculatePlanProgress(plan?.tasks)
   const [newTaskText, setNewTaskText] = useState('')
@@ -348,11 +367,25 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
             Auto-built from unfinished autopsy items. Check them off to revive this build.
           </p>
         </div>
-        <div className="text-right">
-          <span className="text-sm font-bold text-[#0B7A55] font-mono">
-            {progress.completed}/{progress.total}
-          </span>
-          <span className="text-xs text-[#4D5E53] ml-1">({progress.percent}%)</span>
+        <div className="flex items-center gap-2.5 shrink-0">
+          {onCopyPrompt && (
+            <button
+              type="button"
+              onClick={onCopyPrompt}
+              className="text-xs border border-[#C8963E]/60 bg-white hover:bg-[#F7ECD2] text-[#8A6414] font-semibold px-3 py-1 rounded-full cursor-pointer transition-colors shadow-2xs flex items-center gap-1.5"
+              title="Copy checklist as AI prompt for Cursor / Claude Code"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#C8963E]" />
+              <span className="hidden sm:inline">Copy as AI prompt</span>
+              <span className="sm:hidden">Prompt</span>
+            </button>
+          )}
+          <div className="text-right">
+            <span className="text-sm font-bold text-[#0B7A55] font-mono">
+              {progress.completed}/{progress.total}
+            </span>
+            <span className="text-xs text-[#4D5E53] ml-1">({progress.percent}%)</span>
+          </div>
         </div>
       </div>
 
@@ -542,8 +575,8 @@ function AutopsyView({
   project,
   onClose,
   onFate,
-  onAdopt,
   onToggleAdoptable,
+  onRequestAdopt,
   onDeleteRequest,
   onUpdatePlan,
   onGeneratePlan,
@@ -552,7 +585,6 @@ function AutopsyView({
   const modalRef = useModalTrap({ isOpen: true, onClose })
   const score = resurrectionScore(project)
   const breakdown = scoreBreakdown(project)
-  const [adopter, setAdopter] = useState('')
   const [copied, setCopied] = useState(false)
   const [sharing, setSharing] = useState(false)
   const shareCardRef = useRef(null)
@@ -578,6 +610,36 @@ function AutopsyView({
     }
   }
 
+  const fallbackCopy = (text) => {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    try {
+      document.execCommand('copy')
+    } catch {}
+    document.body.removeChild(ta)
+  }
+
+  const copyRevivalPrompt = () => {
+    const promptText = buildRevivalPrompt(project)
+    const successToast = () => onNotify('Revival prompt copied.')
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(promptText)
+        .then(successToast)
+        .catch(() => {
+          fallbackCopy(promptText)
+          successToast()
+        })
+    } else {
+      fallbackCopy(promptText)
+      successToast()
+    }
+  }
+
   const exportShareCard = async () => {
     if (!shareCardRef.current || sharing) return
     setSharing(true)
@@ -588,8 +650,12 @@ function AutopsyView({
         height: 630,
         cacheBust: true,
       })
+      const slug = (project.id || project.title || 'project')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
       const link = document.createElement('a')
-      link.download = `${project.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-tombstone.png`
+      link.download = `${slug}-tombstone.png`
       link.href = dataUrl
       link.click()
       onNotify('Tombstone image exported (1200×630).')
@@ -639,12 +705,19 @@ function AutopsyView({
                 {copied ? '✓ Copied' : 'Copy summary'}
               </button>
               <button
+                onClick={copyRevivalPrompt}
+                className="text-xs border border-[#C8963E]/60 bg-[#FAF6EE] text-[#8A6414] font-semibold px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-[#F7ECD2] flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#C8963E]" />
+                <span>Copy revival prompt</span>
+              </button>
+              <button
                 onClick={exportShareCard}
                 disabled={sharing}
                 className="text-xs border border-[#E5DECD] bg-[#FAF6EE] text-[#1F2A24] px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-[#F3EEE2] flex items-center gap-1.5 transition-colors disabled:opacity-50"
               >
-                <Share2 className="w-3.5 h-3.5 text-[#C8963E]" />
-                <span>{sharing ? 'Generating…' : 'Share tombstone'}</span>
+                <Download className="w-3.5 h-3.5 text-[#C8963E]" />
+                <span>{sharing ? 'Generating…' : 'Download tombstone'}</span>
               </button>
               {project.repoUrl && (
                 <a
@@ -706,26 +779,21 @@ function AutopsyView({
             <ScoreRing score={score} size={84} />
             <div className="flex-1 w-full">
               <h3 className="font-bold text-xs uppercase tracking-wider text-[#8A6414]">
-                RESURRECTION SCORE — {score}/100
+                RESURRECTION SCORE BREAKDOWN
               </h3>
-              {breakdown.map((b) => (
-                <div key={b.label} className="mt-2.5">
-                  <div className="flex justify-between text-xs text-[#4D5E53]">
-                    <span className="font-medium">{b.label}</span>
-                    <span className="font-mono text-[#1F2A24] font-semibold">
-                      {b.raw} × {b.weight} = +{b.points}
-                    </span>
+              <div className="space-y-2 mt-3">
+                {breakdown.map((b) => (
+                  <div key={b.label} className="bg-white border border-[#E5DECD] rounded-xl px-3.5 py-2 flex items-center justify-between text-xs">
+                    <span className="font-medium text-[#1F2A24]">{b.mathText}</span>
+                    <span className="font-mono text-[#0B7A55] font-bold">+{b.points}</span>
                   </div>
-                  <div className="h-1.5 rounded-full bg-[#E5DECD] mt-1">
-                    <div className="h-full bg-[#C8963E] rounded-full" style={{ width: `${b.raw}%` }} />
-                  </div>
-                </div>
-              ))}
-              <div className="flex justify-between items-center text-xs text-[#1F2A24] font-bold border-t border-[#E5DECD] pt-2.5 mt-3">
-                <span>Total Resurrection Score</span>
-                <span className="font-mono text-[#C8963E] text-sm">+{score} ({score}/100)</span>
+                ))}
               </div>
-              <p className="text-[11px] text-[#4D5E53] mt-2.5 leading-relaxed">
+              <div className="flex justify-between items-center text-sm text-[#1F2A24] font-bold border-t border-[#E5DECD] pt-3 mt-3">
+                <span>Total</span>
+                <span className="font-mono text-[#C8963E] text-base">{score} / 100</span>
+              </div>
+              <p className="text-[11px] text-[#4D5E53] mt-2 leading-relaxed">
                 Formula: 50% idea strength + 30% completeness + 20% dormancy bonus (10 pts/month away, max 100 — distance gives fresh eyes).
               </p>
             </div>
@@ -736,40 +804,54 @@ function AutopsyView({
             project={project}
             onUpdatePlan={onUpdatePlan}
             onGeneratePlan={onGeneratePlan}
+            onCopyPrompt={copyRevivalPrompt}
           />
 
           {/* Adopt a Grave */}
           <div className="mt-5 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-5">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-[#8A6414]">ADOPT A GRAVE</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-[#8A6414]">ADOPT A GRAVE</h3>
+              {project.status === 'Adopted' && (
+                <span className="text-[10px] bg-[#F7ECD2] text-[#8A6414] font-bold px-2 py-0.5 rounded-full border border-[#E5C98A]">
+                  Adopted
+                </span>
+              )}
+            </div>
             {project.status === 'Adopted' ? (
-              <p className="text-sm mt-1 text-[#1F2A24]">
-                This project was adopted by <b className="text-[#8A6414]">{project.adoptedBy}</b>. It gets a second life with a new builder.
-              </p>
+              <div className="mt-2 text-sm text-[#1F2A24] bg-white border border-[#E5C98A] rounded-xl p-3.5">
+                <p>
+                  Adopted by <b className="text-[#8A6414]">{project.adopter?.name || project.adoptedBy}</b>
+                  {project.adopter?.plan ? ` — “${project.adopter.plan}”` : ''}
+                  {project.adopter?.handle ? ` (${project.adopter.handle})` : ''}
+                </p>
+                <p className="text-xs text-[#4D5E53] mt-1">
+                  This grave has a new builder continuing its journey.
+                </p>
+              </div>
             ) : project.adoptable ? (
-              <div className="flex flex-col sm:flex-row gap-2 mt-2.5">
-                <input
-                  value={adopter}
-                  onChange={(e) => setAdopter(e.target.value)}
-                  placeholder="Your name — claim this project"
-                  className="flex-1 bg-white border border-[#E5DECD] rounded-xl px-3.5 py-2 text-sm text-[#1F2A24]"
-                />
+              <div className="mt-2.5">
+                <p className="text-xs text-[#4D5E53] mb-3">
+                  This project was marked for adoption by its creator. You can take over ownership and continue the vision.
+                </p>
                 <button
-                  disabled={!adopter.trim()}
-                  onClick={() => onAdopt(project, adopter.trim())}
-                  className="bg-[#C8963E] hover:bg-[#B3822F] text-white font-bold text-sm px-5 py-2 rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
+                  onClick={() => onRequestAdopt && onRequestAdopt(project)}
+                  className="bg-[#C8963E] hover:bg-[#B3822F] text-white font-bold text-xs px-5 py-2.5 rounded-full cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
                 >
-                  Adopt this project
+                  <HeartHandshake className="w-4 h-4" />
+                  <span>Adopt this grave</span>
                 </button>
               </div>
             ) : (
               <p className="text-sm mt-1 text-[#4D5E53]">Not marked adoptable yet.</p>
             )}
-            <button
-              onClick={() => onToggleAdoptable(project)}
-              className="text-xs underline text-[#4D5E53] hover:text-[#1F2A24] mt-2.5 cursor-pointer block"
-            >
-              {project.adoptable ? 'Remove from adoption list' : 'Mark as adoptable'}
-            </button>
+            {project.status !== 'Adopted' && (
+              <button
+                onClick={() => onToggleAdoptable(project)}
+                className="text-xs underline text-[#4D5E53] hover:text-[#1F2A24] mt-3 cursor-pointer block"
+              >
+                {project.adoptable ? 'Remove from adoption list' : 'Mark as adoptable'}
+              </button>
+            )}
           </div>
 
           {/* Archive Log */}
@@ -839,90 +921,135 @@ function AutopsyView({
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              padding: 60,
-              fontFamily: '"Space Grotesk", sans-serif',
+              padding: '44px 56px',
+              fontFamily: '"Space Grotesk", system-ui, sans-serif',
               boxSizing: 'border-box',
-              border: '12px solid #E5DECD',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Arched tombstone outline / frame */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: '24px',
+                border: '3px solid #E5C98A',
+                borderTopLeftRadius: '260px',
+                borderTopRightRadius: '260px',
+                borderBottomLeftRadius: '28px',
+                borderBottomRightRadius: '28px',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Top header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 2, padding: '0 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <span style={{ fontSize: 36 }}>🪦</span>
-                <span style={{ fontFamily: '"Fraunces", serif', fontSize: 28, fontWeight: 900 }}>
+                <span style={{ fontFamily: '"Fraunces", Georgia, serif', fontSize: 28, fontWeight: 900, color: '#1F2A24' }}>
                   The Project Graveyard
                 </span>
               </div>
               <span
                 style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  letterSpacing: '0.2em',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  letterSpacing: '0.22em',
                   textTransform: 'uppercase',
                   color: '#8A6414',
+                  backgroundColor: '#F7ECD2',
+                  padding: '6px 18px',
+                  borderRadius: '999px',
                 }}
               >
-                Rest in progress
+                Rest in progress. Rise at dawn.
               </span>
             </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ maxWidth: 800 }}>
-                  <h1
-                    style={{
-                      fontFamily: '"Fraunces", serif',
-                      fontSize: 52,
-                      fontWeight: 900,
-                      lineHeight: 1.1,
-                      margin: 0,
-                    }}
-                  >
-                    {project.title}
-                  </h1>
-                  <p
-                    style={{
-                      fontSize: 24,
-                      fontStyle: 'italic',
-                      color: '#4D5E53',
-                      marginTop: 16,
-                    }}
-                  >
-                    “{project.epitaph}”
-                  </p>
-                </div>
-
-                <div
+            {/* Center Content */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 40, position: 'relative', zIndex: 2, padding: '0 24px' }}>
+              <div style={{ maxWidth: 740 }}>
+                <span
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '3px solid #C8963E',
-                    borderRadius: 30,
-                    padding: '24px 36px',
-                    textAlign: 'center',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.15em',
+                    color: '#0B7A55',
+                    display: 'block',
+                    marginBottom: 10,
                   }}
                 >
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#8A6414', letterSpacing: '0.1em' }}>
-                    RESURRECTION SCORE
-                  </div>
-                  <div style={{ fontFamily: '"Fraunces", serif', fontSize: 64, fontWeight: 900, color: '#C8963E' }}>
-                    {score}
-                    <span style={{ fontSize: 24, color: '#4D5E53' }}>/100</span>
-                  </div>
+                  {project.status === 'Revived' ? 'Revived Project' : project.status === 'Adopted' ? 'Adopted Grave' : 'Dormant Monument'}
+                </span>
+                <h1
+                  style={{
+                    fontFamily: '"Fraunces", Georgia, serif',
+                    fontSize: 54,
+                    fontWeight: 900,
+                    lineHeight: 1.12,
+                    margin: 0,
+                    color: '#1F2A24',
+                  }}
+                >
+                  {project.title}
+                </h1>
+                <div style={{ width: '120px', height: '2px', background: 'linear-gradient(90deg, #C8963E, transparent)', margin: '16px 0' }} />
+                <p
+                  style={{
+                    fontSize: 22,
+                    fontStyle: 'italic',
+                    color: '#4D5E53',
+                    margin: 0,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  “{project.epitaph}”
+                </p>
+              </div>
+
+              {/* Arched Score Ring Box */}
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  border: '3px solid #C8963E',
+                  borderRadius: '36px',
+                  padding: '28px 36px',
+                  textAlign: 'center',
+                  boxShadow: '0 8px 24px rgba(200, 150, 62, 0.15)',
+                  minWidth: '220px',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#8A6414', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  Resurrection Score
+                </div>
+                <div style={{ fontFamily: '"Fraunces", Georgia, serif', fontSize: 68, fontWeight: 900, color: '#C8963E', lineHeight: 1, marginTop: 8 }}>
+                  {score}
+                </div>
+                <div style={{ fontSize: 16, color: '#4D5E53', fontWeight: 600, marginTop: 4 }}>
+                  out of 100
                 </div>
               </div>
             </div>
 
+            {/* Bottom Footer */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
+                alignItems: 'center',
                 borderTop: '2px solid #E5DECD',
-                paddingTop: 24,
-                fontSize: 18,
+                paddingTop: 18,
+                fontSize: 16,
                 color: '#4D5E53',
+                position: 'relative',
+                zIndex: 2,
+                paddingLeft: 24,
+                paddingRight: 24,
               }}
             >
               <span>{project.completeness}% built • Dormant {project.monthsDormant} months</span>
-              <span style={{ fontStyle: 'italic' }}>Every unfinished project deserves a second chance.</span>
+              <span style={{ fontWeight: 700, color: '#8A6414' }}>https://project-graveyard.vercel.app</span>
             </div>
           </div>
         </div>
@@ -1157,12 +1284,147 @@ function GraveyardInsights({ projects, onSelectProject }) {
   )
 }
 
-function AdoptAGraveSection({ projects, onOpenAutopsy }) {
-  const adoptableProjects = projects.filter((p) => p.adoptable && p.status === 'Dormant')
-  if (adoptableProjects.length === 0) return null
+function AdoptModal({ project, isOpen, onClose, onConfirm }) {
+  const modalRef = useModalTrap({ isOpen, onClose })
+  const [name, setName] = useState('')
+  const [plan, setPlan] = useState('')
+  const [handle, setHandle] = useState('')
+
+  if (!isOpen || !project) return null
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!name.trim() || !plan.trim()) return
+    onConfirm(project, {
+      name: name.trim(),
+      plan: plan.trim().slice(0, 140),
+      handle: handle.trim(),
+    })
+    onClose()
+  }
+
+  const charsRemaining = 140 - plan.length
 
   return (
-    <section className="max-w-6xl mx-auto px-4 py-8">
+    <motion.div
+      className="fixed inset-0 z-50 bg-[rgba(20,32,26,0.45)] backdrop-blur-[6px] flex items-end sm:items-center justify-center p-0 sm:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        ref={modalRef}
+        initial={{ scale: 0.96, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white border border-[#E5DECD] w-full max-w-lg max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl card-shadow text-[#1F2A24] overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Adopt ${project.title}`}
+      >
+        <div className="p-6 pb-4 border-b border-[#E5DECD]/60 flex items-start justify-between gap-4 shrink-0 bg-white">
+          <div>
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-[#F7ECD2] text-[#8A6414]">
+              Community Adoption
+            </span>
+            <h2 className="font-display text-2xl font-black mt-2 text-[#1F2A24]">
+              Adopt {project.title}
+            </h2>
+            <p className="text-xs text-[#4D5E53] italic mt-0.5">
+              “{project.epitaph}”
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-10 h-10 flex items-center justify-center text-2xl leading-none rounded-full text-[#4D5E53] hover:text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer shrink-0 transition-colors"
+            aria-label="Close adoption modal"
+          >
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 pt-4 flex flex-col gap-4 overflow-y-auto modal-scrollbar">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#1F2A24] mb-1.5">
+              Your Name or Pseudonym <span className="text-[#BC3F26]">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Alex Chen"
+              className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-xl px-3.5 py-2.5 text-sm text-[#1F2A24] focus:bg-white focus:border-[#C8963E] outline-none transition-colors"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#1F2A24]">
+                My plan in one line <span className="text-[#BC3F26]">*</span>
+              </label>
+              <span className={`text-[11px] font-mono ${charsRemaining < 20 ? 'text-[#BC3F26] font-bold' : 'text-[#8A9A8E]'}`}>
+                {charsRemaining} left
+              </span>
+            </div>
+            <input
+              type="text"
+              required
+              maxLength={140}
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              placeholder="e.g. Fork to Next.js 15, wire transcription API, ship beta"
+              className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-xl px-3.5 py-2.5 text-sm text-[#1F2A24] focus:bg-white focus:border-[#C8963E] outline-none transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#1F2A24] mb-1.5">
+              Contact or GitHub Handle <span className="text-[#8A9A8E] lowercase font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="@username or email"
+              className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-xl px-3.5 py-2.5 text-sm text-[#1F2A24] focus:bg-white focus:border-[#C8963E] outline-none transition-colors"
+            />
+          </div>
+
+          <div className="bg-[#F7ECD2]/50 border border-[#E5C98A] rounded-xl p-3 text-xs text-[#8A6414]">
+            💡 Adopting updates the project status to <b>Adopted</b>, stamps your name on the grave record, and welcomes you into the activity log.
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-bold text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!name.trim() || !plan.trim()}
+              className="bg-[#C8963E] hover:bg-[#B3822F] text-white text-xs font-bold px-6 py-2.5 rounded-full cursor-pointer shadow-xs disabled:opacity-40 transition-all"
+            >
+              Confirm adoption
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function AdoptAGraveSection({ projects, onOpenAutopsy, onStartAdopt, onMarkFirstAdoptable }) {
+  const adoptableProjects = projects.filter((p) => p.adoptable && p.status === 'Dormant')
+
+  return (
+    <section id="adoptable-graves" className="max-w-6xl mx-auto px-4 py-8">
       <div className="bg-gradient-to-r from-[#F7ECD2]/60 via-white to-[#F7ECD2]/30 border border-[#E5C98A] rounded-[24px] p-6 sm:p-7 card-shadow">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
@@ -1181,37 +1443,81 @@ function AdoptAGraveSection({ projects, onOpenAutopsy }) {
           </span>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          {adoptableProjects.map((p) => (
-            <div
-              key={p.id}
-              className="bg-white border border-[#E5DECD] rounded-2xl p-4.5 flex flex-col justify-between card-shadow"
+        {adoptableProjects.length === 0 ? (
+          <div className="bg-white/80 border border-[#E5C98A]/60 rounded-2xl p-8 text-center mt-4">
+            <p className="text-sm font-medium text-[#1F2A24]">
+              No graves are waiting for a new builder yet.
+            </p>
+            <p className="text-xs text-[#4D5E53] mt-1 mb-4">
+              Mark an unfinished project as adoptable to let other builders take over.
+            </p>
+            <button
+              onClick={onMarkFirstAdoptable}
+              className="bg-[#C8963E] hover:bg-[#B3822F] text-white text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer shadow-xs transition-all"
             >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F7ECD2] text-[#8A6414]">
-                    Adoptable
-                  </span>
-                  <span className="font-display font-bold text-sm text-[#8A6414]">
-                    Score: {resurrectionScore(p)}
-                  </span>
-                </div>
-                <h4 className="font-bold text-base text-[#1F2A24] mt-2">{p.title}</h4>
-                <p className="text-xs text-[#4D5E53] italic mt-1 line-clamp-2">“{p.epitaph}”</p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-[#E5DECD]/60 flex items-center justify-between">
-                <span className="text-xs text-[#4D5E53]">{p.completeness}% built</span>
-                <button
-                  onClick={() => onOpenAutopsy(p)}
-                  className="bg-[#C8963E] hover:bg-[#B3822F] text-white text-xs font-bold px-4 py-1.5 rounded-full cursor-pointer shadow-xs transition-all"
+              Browse dormant graves to mark adoptable
+            </button>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {adoptableProjects.map((p) => {
+              const unfinishedPreview = p.unfinished && p.unfinished.length > 0
+                ? p.unfinished.slice(0, 2).join(', ') + (p.unfinished.length > 2 ? ` (+${p.unfinished.length - 2} more)` : '')
+                : 'Unfinished milestones recorded in autopsy'
+              return (
+                <div
+                  key={p.id}
+                  className="bg-white border border-[#E5DECD] rounded-2xl p-4.5 flex flex-col justify-between card-shadow"
                 >
-                  Adopt
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F7ECD2] text-[#8A6414]">
+                        Adoptable
+                      </span>
+                      <span className="font-display font-bold text-sm text-[#8A6414]">
+                        Score: {resurrectionScore(p)}
+                      </span>
+                    </div>
+                    <h4
+                      onClick={() => onOpenAutopsy(p)}
+                      className="font-bold text-base text-[#1F2A24] mt-2 cursor-pointer hover:text-[#C8963E] transition-colors"
+                    >
+                      {p.title}
+                    </h4>
+                    <p className="text-xs text-[#4D5E53] italic mt-1 line-clamp-2">“{p.epitaph}”</p>
+
+                    <div className="mt-3 text-xs bg-[#FAF6EE] border border-[#E5DECD] rounded-xl p-2.5">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#8A6414] block mb-0.5">
+                        Unfinished
+                      </span>
+                      <span className="text-[#1F2A24] line-clamp-2">
+                        {unfinishedPreview}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-[#E5DECD]/60 flex items-center justify-between gap-2">
+                    <span className="text-xs text-[#4D5E53]">{p.completeness}% built</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => onOpenAutopsy(p)}
+                        className="text-xs text-[#4D5E53] hover:text-[#1F2A24] px-2.5 py-1 rounded-full cursor-pointer hover:bg-[#F3EEE2]"
+                      >
+                        Autopsy
+                      </button>
+                      <button
+                        onClick={() => onStartAdopt(p)}
+                        className="bg-[#C8963E] hover:bg-[#B3822F] text-white text-xs font-bold px-4 py-1.5 rounded-full cursor-pointer shadow-xs transition-all"
+                      >
+                        Adopt this grave
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </section>
   )
@@ -1883,6 +2189,7 @@ export function AppContent() {
   const [projects, setProjects] = useState(() => loadProjects() || SEED)
   const [selectedId, setSelectedId] = useState(null)
   const [showBury, setShowBury] = useState(false)
+  const [adoptProject, setAdoptProject] = useState(null)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [selectedTag, setSelectedTag] = useState('All')
@@ -1916,7 +2223,7 @@ export function AppContent() {
 
   // Modal behaviour: Esc closes, scroll lock, focus restoration
   useEffect(() => {
-    const isModalOpen = selectedId || showBury || confirmDialog.isOpen
+    const isModalOpen = selectedId || showBury || adoptProject || confirmDialog.isOpen
     if (!isModalOpen) {
       if (lastOpenerRef.current && typeof lastOpenerRef.current.focus === 'function') {
         lastOpenerRef.current.focus()
@@ -1933,6 +2240,7 @@ export function AppContent() {
       if (e.key === 'Escape') {
         setSelectedId(null)
         setShowBury(false)
+        setAdoptProject(null)
         setConfirmDialog({ isOpen: false })
       }
     }
@@ -1943,7 +2251,7 @@ export function AppContent() {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [selectedId, showBury, confirmDialog.isOpen])
+  }, [selectedId, showBury, adoptProject, confirmDialog.isOpen])
 
   const notify = (message) => {
     const id = Date.now() + Math.random()
@@ -1960,6 +2268,7 @@ export function AppContent() {
     dormant: projects.filter((p) => p.status === 'Dormant').length,
     resurrected: projects.filter((p) => p.status === 'Resurrected' || p.status === 'Revived').length,
     adopted: projects.filter((p) => p.status === 'Adopted').length,
+    adoptable: projects.filter((p) => p.adoptable && p.status === 'Dormant').length,
     avgScore: projects.length ? Math.round(projects.reduce((a, p) => a + resurrectionScore(p), 0) / projects.length) : 0,
   }), [projects])
 
@@ -2102,14 +2411,28 @@ export function AppContent() {
     }
   }
 
-  const handleAdopt = (project, name) => {
+  const handleAdopt = (project, adopterData) => {
+    const adopterObj = typeof adopterData === 'string'
+      ? { name: adopterData, plan: 'Continuing this build.', handle: '', date: now() }
+      : {
+          name: adopterData.name?.trim() || 'Anonymous Builder',
+          plan: adopterData.plan?.trim().slice(0, 140) || '',
+          handle: adopterData.handle?.trim() || '',
+          date: now(),
+        }
+
+    const logText = adopterObj.plan
+      ? `Adopted by ${adopterObj.name} — "${adopterObj.plan}"`
+      : `Adopted by ${adopterObj.name} — second life begins.`
+
     update(project.id, (p) => ({
       ...p,
       status: 'Adopted',
-      adoptedBy: name,
-      log: [...p.log, { date: now(), text: `Adopted by ${name} — second life begins.` }],
+      adoptedBy: adopterObj.name,
+      adopter: adopterObj,
+      log: [...p.log, { date: now(), text: logText }],
     }))
-    notify(`Project adopted by ${name} — second life begins!`)
+    notify(`Adopted! ${project.title} has a new builder.`)
   }
 
   const handleToggleAdoptable = (project) => {
@@ -2120,6 +2443,17 @@ export function AppContent() {
       log: [...p.log, { date: now(), text: willBeAdoptable ? 'Marked adoptable.' : 'Removed from adoption list.' }],
     }))
     notify(willBeAdoptable ? 'Marked adoptable.' : 'Removed from adoption list.')
+  }
+
+  const handleMarkFirstAdoptable = () => {
+    const dormant = projects.find((p) => p.status === 'Dormant' && !p.adoptable)
+    if (dormant) {
+      handleToggleAdoptable(dormant)
+      notify(`Marked "${dormant.title}" as adoptable!`)
+    } else {
+      const el = document.getElementById('graveyard-grid')
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }
   }
 
   const promptDelete = (project) => {
@@ -2326,7 +2660,14 @@ export function AppContent() {
               <span className="italic text-[#C8963E]">until they rise again.</span>
             </h1>
             <p className="text-[#4D5E53] text-base sm:text-lg mt-3.5 max-w-xl leading-relaxed">
-              Every unfinished project deserves a second chance.
+              Every unfinished project deserves a second chance.{' '}
+              <a
+                href="#adoptable-graves"
+                className="inline-flex items-center gap-1 font-semibold text-[#8A6414] hover:underline cursor-pointer"
+              >
+                <span>Explore {stats.adoptable} adoptable graves</span>
+                <span>→</span>
+              </a>
             </p>
 
             <div className="flex flex-wrap items-center gap-3 mt-7">
@@ -2396,15 +2737,21 @@ export function AppContent() {
             <span className="text-[11px] font-bold tracking-wider text-[#0B7A55] uppercase mt-1">REVIVED / ACTIVE</span>
           </div>
 
-          <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2">
-            <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#8A6414] mb-1.5 shadow-2xs">
+          <a
+            href="#adoptable-graves"
+            className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2 hover:opacity-85 transition-opacity cursor-pointer group"
+            title="Jump to Adoptable Graves"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#8A6414] mb-1.5 shadow-2xs group-hover:scale-105 transition-transform">
               <HeartHandshake className="w-5 h-5" strokeWidth={1.5} />
             </div>
             <div className="font-display text-3xl sm:text-4xl font-black text-[#1F2A24]">
               <AnimatedNumber value={stats.adopted} />
             </div>
-            <span className="text-[11px] font-bold tracking-wider text-[#4D5E53] uppercase mt-1">ADOPTED</span>
-          </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#4D5E53] uppercase mt-1 group-hover:text-[#8A6414] transition-colors">
+              ADOPTED ({stats.adoptable} OPEN)
+            </span>
+          </a>
 
           <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2 col-span-2 sm:col-span-1">
             <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#C8963E] mb-1.5 shadow-2xs">
@@ -2471,6 +2818,8 @@ export function AppContent() {
       <AdoptAGraveSection
         projects={projects}
         onOpenAutopsy={(p) => setSelectedId(p.id)}
+        onStartAdopt={(p) => setAdoptProject(p)}
+        onMarkFirstAdoptable={handleMarkFirstAdoptable}
       />
 
       {/* Tag Chips Row */}
@@ -2610,8 +2959,8 @@ export function AppContent() {
             project={selected}
             onClose={() => setSelectedId(null)}
             onFate={handleFate}
-            onAdopt={handleAdopt}
             onToggleAdoptable={handleToggleAdoptable}
+            onRequestAdopt={(p) => setAdoptProject(p)}
             onDeleteRequest={promptDelete}
             onUpdatePlan={handleUpdatePlan}
             onGeneratePlan={handleGeneratePlan}
@@ -2623,6 +2972,14 @@ export function AppContent() {
             onClose={() => setShowBury(false)}
             onSave={handleSave}
             onNotify={notify}
+          />
+        )}
+        {adoptProject && (
+          <AdoptModal
+            project={adoptProject}
+            isOpen={Boolean(adoptProject)}
+            onClose={() => setAdoptProject(null)}
+            onConfirm={handleAdopt}
           />
         )}
       </AnimatePresence>

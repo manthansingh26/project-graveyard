@@ -5,105 +5,145 @@
 A digital afterlife for abandoned software — built for **Baloon National Hackathon 2026, Round 2** by **Manthan Rajpurohit** (Team: Straw hat pirate), continuing the Round 1 entry *PS 05 — The Project Graveyard*.
 
 > *"Projects rest at night, they rise at dawn."*
-> Restyled with a serene, print-inspired **Dawn Theme** — warm ivory `#FAF6EE`, white `#FFFFFF` cards with hairline `#E5DECD` borders, tactile Apple-style spring micro-interactions, and gold & green accents.
+> Built with a serene, print-inspired **Dawn Theme** — warm ivory `#FAF6EE`, crisp cards with hairline borders `#E5DECD`, Apple-grade spring micro-interactions, Fraunces serif headlines, and gold & emerald accents. Respectful and calm: no roasts, no horror, no jokes about failure.
 
-Builders abandon projects they once cared about, and the idea, the code, and the lessons disappear with them — scattered across forgotten folders like `final-final-v2`. The Project Graveyard gives every unfinished project a structured record: what it was, what was built, what is still unfinished, and honestly, why it stopped. Then it helps you decide what happens next.
+---
 
-## Live flow: Bury → Autopsy → Score → Fate → Revival Plan
+## 3-Line Problem & Solution
 
-1. **Bury It** — Add an unfinished project with its title, epitaph, original vision, and tags (or auto-fill directly from a public GitHub repo).
-2. **Perform the Autopsy** — Record what was built, what remains unfinished, and the honest reason work stopped.
-3. **Resurrection Score** — A transparent, explainable heuristic (not random, not AI):
-   `Score = 50% Idea Strength + 30% Completeness + 20% Dormancy Bonus`
-   Dormancy bonus = 10 points per month away, capped at 100 — distance gives a builder fresh eyes. The Autopsy view shows the full breakdown bar-by-bar.
-4. **Choose Its Fate** — **Continue** it, **Restart** smarter, **Repurpose** its modules, or **Archive** it with honour. The decision is written to the project's Archive Log.
-5. **Revival Plan** — Generate an actionable, editable checklist auto-built from the project's unfinished autopsy items plus a final task "Ship the revived version". Checking off milestones tracks progress % live on the tombstone card and autopsy view, flipping the project to **Revived ✓** upon completion.
-6. **Adopt a Grave** — Mark a project adoptable, and another builder can claim it by name and give it a second life.
+- **Problem:** Builders abandon projects when momentum stalls, leaving ideas, working code, and hard-earned lessons scattered across forgotten local folders and dead repos.
+- **Insight:** Unfinished code shouldn't rot in guilt—stepping away gives fresh perspective, and another builder (or your future self) can bring it across the finish line.
+- **Solution:** The Project Graveyard gives abandoned software an honest autopsy, computes an explainable Resurrection Score, generates an AI revival prompt, and lets community builders adopt projects with a single-line plan.
+
+---
+
+## Preview
+
+![The Project Graveyard — Dawn Digital Afterlife](/og.png)
+
+---
+
+## The Resurrection Score Formula
+
+The Resurrection Score is a transparent, explainable heuristic (not a random number, not an opaque AI hallucination):
+
+$$\text{Resurrection Score} = 50\% \times \text{Idea Strength} + 30\% \times \text{Completeness} + 20\% \times \text{Dormancy Bonus}$$
+
+- **Idea Strength (0–100):** How compelling and impactful the core problem is.
+- **Completeness (0–100):** How much functional UI and logic was built before work paused.
+- **Dormancy Bonus (0–100):** Calculated as $10 \text{ points per month dormant}$, capped at $100$. Distance and time give a builder fresh eyes and detached clarity.
+
+### Worked Example: *ShaderCanvas Studio*
+- Idea strength: $92 \times 50\% = +46$
+- Completeness: $85 \times 30\% = +26$ (rounded)
+- Dormancy: $7 \text{ months} \times 10 = 70 \text{ bonus points} \times 20\% = +14$
+- **Total Resurrection Score:** $46 + 26 + 14 = \mathbf{86 / 100}$
+
+*(Seed scores stay strictly preserved across the graveyard: ShaderCanvas 86, PulseNote 82, DevPulse 76).*
+
+---
 
 ## Features
 
-- **Dawn Design System**: Warm ivory background (`#FAF6EE`) with subtle paper grain texture, crisp white cards (`#FFFFFF`), hairline warm borders (`#E5DECD`), ink typography (`#1E2B23`), and warm Apple-like depth shadows.
-- **Hero & Dawn Arch Illustration**: 2-column desktop layout pairing the signature gold-accented headline with the full-framed dawn arch visual (`hero-dawn.webp`), and direct CTAs (*Bury a project* & *Fetch from GitHub*).
-- **Single White Strip Stats Card**: 5 segmented counters separated by hairline dividers (Buried / Dormant / Revived & Active / Adopted / Average Score).
-- **Revival Radar**: Concurrently sweeps soft green concentric radar rings on ivory, dynamically spotlighting the highest-scoring dormant project with giant gold serif score typography (`86 / 100`).
-- **Clean Monogram Print Cards**: 56px rounded-14 monogram tile with project initials and tint, SVG score ring, completeness progress track, badges (*Revival-Ready*, *Adoptable*, *Revived ✓*), and live Revival Plan progress indicator.
-- **Revival Plan (Action Checklist)**: Auto-built from autopsy unfinished items, interactive milestone checkboxes, in-place editing, milestone additions/deletions, and automatic transition to `Revived ✓`.
-- **Graveyard Insights**: Real-time analytics strip featuring:
-  - **Pure-SVG Donut Chart** showing status distribution (Dormant, Resurrected, Revived ✓, Adopted, Archived)
-  - **Score Distribution Bars** (0–59 Deep Hibernation / 60–79 Promising / 80–100 Revival Ready)
-  - **Dormancy & Recovery Metrics** (average dormancy in months, revival readiness ratio, oldest grave link)
-- **Tag Filter Bar & Search**: Dynamic tag chips with live counts, search box with `/` keyboard focus shortcut and `<kbd>` hint.
-- **Graveyard Chronicles (Unified Activity Feed)**: Reverse-chronological timeline aggregating all burials, fate decisions, adoptions, and completed revival tasks.
-- **Bury-from-GitHub**: Fast public GitHub API auto-fill for repo name, description, tags/languages, and dormancy months.
-- **Apple-Inspired Motion**: Spring physics (`stiffness: 260, damping: 30`) on dialogs/toasts, active pointer-down feedback (`active:scale-[0.97]`), focus restoration, and full `prefers-reduced-motion` compliance.
-- **Hardened Data Layer**: Versioned schema with migration, corruption fallback, and feedback toasts.
-- **Custom In-App Confirm Dialogs**: Eliminates all browser-native `confirm()` popups.
-- **Resilient Error Boundary**: Calm dawn fallback screen with reload and data reset utilities.
+- **Adopt-a-Grave Community Section**:
+  - Dedicated section on the home page directly below the Revival Radar showcasing all claimable graves.
+  - Compact cards displaying title, epitaph, score, and unfinished milestones.
+  - **Adopt Flow Modal**: Requires builder name, "My plan in one line" (max 140 chars with live counter), and optional GitHub/contact handle.
+  - On confirmation: transitions status to `Adopted`, logs activity feed entry, updates live stats strip, and displays `"Adopted by <name> — <plan>"` on the tombstone and inside the autopsy.
+  - Empty state with a single-click action to mark dormant graves adoptable.
+- **"Copy as AI Prompt" for Cursor & Claude Code**:
+  - Pure function `buildRevivalPrompt(project)` generating structured, ready-to-paste Markdown including original vision, what was built, what remains unfinished, honest reason it stopped, chosen fate, markdown checklist (`[x]` / `[ ]`), and closing instruction: *"Start with the first unchecked task; keep scope small; ship a working version"*.
+  - Direct clipboard copy with fallback and toast feedback.
+- **Downloadable Tombstone PNG (1200×630)**:
+  - Generates high-resolution social shareable tombstone card using dynamically imported `html-to-image`.
+  - Arched tombstone silhouette frame, Fraunces serif typography, centered score ring, app URL, and tagline *"Rest in progress. Rise at dawn."*
+  - Automatically saved as `<slug>-tombstone.png`.
+- **Arched Tombstone Cards**:
+  - Large top radius arched header with centered score ring.
+  - Serif title, italic epitaph beneath a thin gold gradient divider rule.
+  - Equal card heights with pinned footer and dedicated slot for live revival plan progress or adopter plan.
+  - Subtle hover lift with soft warm gold glow (`prefers-reduced-motion` compliant).
+- **Interactive Autopsy & Revival Plan**:
+  - Structured records of vision, built modules, unfinished work, and the honest reason it stopped.
+  - Step-by-step checklist with inline task editing, additions, deletions, and toggleable checkboxes.
+  - Unchecking after reaching `Revived ✓` sensibly reverts the status and logs it once.
+- **Bury from GitHub API**:
+  - Paste any repository URL (supports `.git`, `/tree/main`, `/blob/...`, `www.`, or owner/repo shorthand).
+  - Handles 404 with `"Repo not found or private"`.
+  - On 403 rate-limit or network errors, automatically prefills the title from the repo slug so the builder can continue seamlessly.
+- **Hardened Data Layer (Schema Version 2)**:
+  - Versioned storage with schema migration from v1 `adoptedBy` to v2 structured `adopter` object.
+  - Validated JSON export & import that never wipes existing data on invalid input and resets file inputs for repeated imports.
+  - First visit and "Reset demo" provide exactly 3 dormant seeds, 0 revived, 0 adopted, and 3 activity events.
 
-## Architecture
+---
 
-The application is structured into three clean, decoupled layers:
+## Demo Flow in 90 Seconds
 
-1. **Presentation Layer (`src/App.jsx`, `src/index.css`)**:
-   - Modern React 19 component tree styled with Tailwind CSS v4 design tokens.
-   - Framer Motion animation system for physics-based spring transitions and tactile button responses.
-   - Responsive layouts optimized for 360px mobile viewports through 1440px desktop displays.
+Follow this exact walkthrough during judging:
 
-2. **Logic Layer (`src/score.js`, `src/utils.js`)**:
-   - Pure, deterministic functions: Resurrection Score heuristic, breakdown point distributor, Revival Plan milestone builder, Graveyard Insights analytics, and reverse-chronological log merger.
-   - Covered by comprehensive automated unit tests (`src/score.test.js`, `src/utils.test.js`).
+1. **0:00–0:15 | First Impression & Revival Radar**
+   - Note the warm ivory Dawn theme (#FAF6EE),Fraunces serif headlines, and stats strip.
+   - Observe the **Revival Radar** with its 6-second radial sweep highlighting **ShaderCanvas Studio** as the strongest candidate (Score: **86 / 100**).
+2. **0:15–0:35 | Bury from GitHub**
+   - Click **"Bury a project"** in the hero.
+   - Paste a GitHub URL (e.g. `github.com/facebook/react/tree/main`).
+   - Watch the repository name, description, tags, and dormancy automatically prefill. Fill in the honest reason work stopped and submit.
+3. **0:35–0:50 | The Autopsy & Score Breakdown**
+   - Click any card (e.g., *ShaderCanvas Studio*) to open its **Autopsy**.
+   - Review what was built vs. still unfinished, plus the honest reason work stopped.
+   - Inspect the **Score Breakdown**: verify the exact calculation rows (`92 × 50% = +46`, `85 × 30% = +26`, `7 mo × 10 = 70 × 20% = +14`) totaling **86 / 100**.
+4. **0:50–1:05 | AI Prompt & Fate Selection**
+   - In the autopsy, click **"Copy revival prompt"** &rarr; see toast confirmation. Paste it into an editor to show the generated Markdown for Cursor/Claude Code.
+   - Select fate **Continue** &rarr; watch the auto-generated Revival Plan checklist appear.
+5. **1:05–1:20 | Progress to "Revived ✓"**
+   - Check off each milestone in the checklist.
+   - As the final task is completed, observe the celebratory confetti animation and status transition to **Revived ✓**.
+   - Uncheck one item to demonstrate sensible status reversion.
+6. **1:20–1:30 | Community Adoption & Tombstone Download**
+   - In the autopsy, click **"Download tombstone"** &rarr; downloads `shadercanvas-studio-tombstone.png` (1200×630).
+   - Scroll down to the **Adopt-a-Grave** section, click **"Adopt this grave"**, enter your name and a 140-character plan &rarr; submit.
+   - Watch the card update with your adopter badge, log entry, and stats strip count increment.
 
-3. **Data Layer (`src/storage.js`, `src/storage.test.js`)**:
-   - Versioned storage service (`STORAGE_KEY = 'project-graveyard-v1'`, `SCHEMA_VERSION = 1`).
-   - Seamless silent migration for legacy raw-array localStorage data to wrapped `{ version: 1, projects: [...] }`.
-   - Complete resilience against corrupted JSON (falls back safely to default seed data without throwing errors to the UI).
-   - Storage adapter design makes the client trivially swappable for Supabase or cloud backends post-hackathon.
+---
 
-## Tech stack
+## Tech Stack & Verification
 
-| Layer | Choice | Why |
+| Layer | Choice | Rationale |
 |---|---|---|
-| UI | React 19 + Vite | Component-driven architecture, instant HMR, tiny production bundles |
-| Styling | Tailwind CSS v4 | Dawn design system, warm ivory palette, Apple-like shadow tokens |
-| Motion | Framer Motion | Spring-physics dialogs, interruptible gestures, reduced-motion support |
-| Data & Storage | Versioned localStorage | Zero-backend persistence, migration support, portable JSON export/import |
-| Charts | Pure SVG | Zero external dependencies; reactive donut charts & score bars |
-| Deployment | Vercel | Static CDN deployment ready for immediate live judging |
+| **Framework** | React 19 + Vite 8 | Instant HMR, fast builds, clean JSX |
+| **Styling** | Tailwind CSS v4 | Curated Dawn palette, custom tokens, native CSS variables |
+| **Animation** | Framer Motion 14 | Spring physics, fluid dialog entries, reduced-motion overrides |
+| **Icons** | Lucide React | Minimalist line icons |
+| **Image Generation** | html-to-image (lazy-loaded) | High-fidelity 1200×630 social tombstone graphics |
+| **Testing** | Node.js Test Runner (`node --test`) | Zero-dependency, ultra-fast test suite (20/20 pass) |
+| **Linter** | Oxlint | High-speed Rust-based linting (0 warnings, 0 errors) |
 
-## Run it locally
+### Validation Commands
 
 ```bash
-npm install
-npm run dev       # http://localhost:5173
-npm test          # 17 automated unit tests across score, utils, and storage
+npm test          # 20 automated unit tests (score, utils, storage migrations)
 npm run lint      # oxlint static analysis (0 warnings, 0 errors)
 npm run build     # production build → dist/
-npm run preview   # preview production build on http://localhost:4173
 ```
 
-## Project structure
+---
+
+## File Structure
 
 ```
 src/
-  App.jsx          # UI: dawn theme layout, hero, radar, cards, autopsy, revival plan, insights, activity feed
-  score.js         # Resurrection Score pure logic (50/30/20 formula)
-  score.test.js    # Unit tests proving seed scores: 82 / 86 / 76
-  storage.js       # Versioned data layer ({ version: 1, projects }) with migration & fallback
-  storage.test.js  # Storage unit tests (roundtrip, migration, corrupted data resilience)
-  utils.js         # Pure helpers: GitHub parsing, plan builder, progress calculator, insights, activity merger
-  utils.test.js    # Unit tests for pure helpers
-  main.jsx         # App entry point with React root
-  index.css        # Dawn theme styling, paper grain, tokens, shadows, tactile feel
-index.html         # Inline SVG dawn favicon, theme-color (#FAF6EE), SEO & Open Graph meta
+├── App.jsx          # UI components: Hero, Radar, TombstoneCard, AdoptAGrave, AutopsyView, Modals
+├── score.js         # Resurrection Score formula & additivity-guaranteed breakdown math
+├── score.test.js    # Unit tests for scoring math and integer point sum guarantees
+├── storage.js       # Versioned LocalStorage layer (Schema v2) with migration & import validation
+├── storage.test.js  # Storage unit tests: v1 -> v2 migration, roundtrip, corruption safety
+├── utils.js         # Pure helpers: GitHub parsing, buildRevivalPrompt, plan calculations, insights
+├── utils.test.js    # Unit tests for GitHub parser, prompt generator, and time formatting
+├── index.css        # Dawn theme styling, custom range sliders, focus states, card glow
+└── main.jsx         # App root mount
 ```
 
-## Why this wins
-
-- **Distinctive concept** — a cemetery for projects, never a place of shame. Memorable in a room of generic dashboards.
-- **Lived experience** — every student, hackathon participant, and indie maker has a folder full of dead projects.
-- **Action tool, not just an archive** — the Revival Plan turns past autopsies into actionable checklists that guide projects back to life.
-- **High taste level** — calm, warm dawn aesthetics, editorial typography, and Apple-grade tactile feedback.
-- **Realistic scope, fully shipped** — frontend-only, tested, hardened, and working end-to-end.
-
 ---
-*Projects rest at night, they rise at dawn.*
+
+*“Every unfinished project deserves a second chance.”*

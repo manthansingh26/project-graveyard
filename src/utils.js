@@ -148,3 +148,47 @@ export function mergeActivityFeed(projects) {
   })
   return items.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 }
+
+export function buildRevivalPrompt(project) {
+  if (!project || typeof project !== 'object') return ''
+
+  const builtList = Array.isArray(project.built) && project.built.length > 0
+    ? project.built.map((b) => `- ${b}`).join('\n')
+    : '- (No built features recorded)'
+
+  const unfinishedList = Array.isArray(project.unfinished) && project.unfinished.length > 0
+    ? project.unfinished.map((u) => `- ${u}`).join('\n')
+    : '- (No unfinished items recorded)'
+
+  const tasks = project.revivalPlan?.tasks
+  const checklist = Array.isArray(tasks) && tasks.length > 0
+    ? tasks.map((t) => `- [${t.done ? 'x' : ' '}] ${t.text}`).join('\n')
+    : (Array.isArray(project.unfinished) && project.unfinished.length > 0
+      ? project.unfinished.map((u) => `- [ ] ${u}`).join('\n')
+      : '- [ ] Define first revival milestone')
+
+  const fate = project.currentFate || (project.status === 'Resurrected' ? 'Continue' : (project.status === 'Archived' ? 'Archive' : 'Restart'))
+
+  return `# Revival Blueprint: ${project.title || 'Untitled Project'}
+
+## Original Vision
+${project.vision || 'No vision recorded.'}
+
+## What Was Built
+${builtList}
+
+## What Is Unfinished
+${unfinishedList}
+
+## Why Work Stopped
+${project.reason || 'No reason recorded.'}
+
+## Chosen Fate
+${fate}
+
+## Revival Checklist
+${checklist}
+
+---
+Start with the first unchecked task; keep scope small; ship a working version.`
+}

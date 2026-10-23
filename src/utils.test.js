@@ -9,6 +9,7 @@ import {
   buildRevivalPlan,
   calculateGraveyardInsights,
   mergeActivityFeed,
+  buildRevivalPrompt,
 } from './utils.js'
 
 test('parses full GitHub URLs and owner/repo shorthand', () => {
@@ -134,4 +135,38 @@ test('mergeActivityFeed gathers all project logs in reverse-chronological order 
   assert.equal(feed[1].type, 'fate')
   assert.equal(feed[2].date, '2026-04-12')
   assert.equal(feed[2].type, 'bury')
+})
+
+test('buildRevivalPrompt generates structured Markdown prompt for Cursor/Claude Code', () => {
+  const project = {
+    title: 'PulseNote — Study Audio',
+    vision: 'Turn lecture recordings into timestamped notes.',
+    built: ['WebAudio recorder', 'Timeline UI'],
+    unfinished: ['Transcript search', 'Audio export'],
+    reason: 'Final exams started.',
+    currentFate: 'Continue',
+    status: 'Resurrected',
+    revivalPlan: {
+      tasks: [
+        { id: '1', text: 'Transcript search', done: true },
+        { id: '2', text: 'Audio export', done: false },
+        { id: '3', text: 'Ship the revived version', done: false },
+      ],
+    },
+  }
+
+  const prompt = buildRevivalPrompt(project)
+  assert.match(prompt, /# Revival Blueprint: PulseNote — Study Audio/)
+  assert.match(prompt, /## Original Vision\nTurn lecture recordings into timestamped notes\./)
+  assert.match(prompt, /- WebAudio recorder/)
+  assert.match(prompt, /- Transcript search/)
+  assert.match(prompt, /Final exams started\./)
+  assert.match(prompt, /Chosen Fate\nContinue/)
+  assert.match(prompt, /- \[x\] Transcript search/)
+  assert.match(prompt, /- \[ \] Audio export/)
+  assert.match(prompt, /- \[ \] Ship the revived version/)
+  assert.match(prompt, /Start with the first unchecked task; keep scope small; ship a working version\./)
+
+  // Graceful empty input
+  assert.equal(buildRevivalPrompt(null), '')
 })

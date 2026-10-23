@@ -16,9 +16,34 @@ export function resurrectionScore(p) {
 }
 
 export function scoreBreakdown(p) {
+  const total = resurrectionScore(p)
+  const ideaPts = Math.round(p.ideaStrength * 0.5)
+  const compPts = Math.round(p.completeness * 0.3)
+  const dormPts = total - ideaPts - compPts
+  const dScore = dormancyScore(p.monthsDormant)
+  const months = Number.isFinite(p.monthsDormant) ? Math.max(0, p.monthsDormant) : 0
+
   return [
-    { label: 'Idea strength', raw: p.ideaStrength, weight: '50%', points: Math.round(p.ideaStrength * 0.5) },
-    { label: 'Completeness', raw: p.completeness, weight: '30%', points: Math.round(p.completeness * 0.3) },
-    { label: 'Dormancy bonus', raw: dormancyScore(p.monthsDormant), weight: '20%', points: Math.round(dormancyScore(p.monthsDormant) * 0.2) },
+    {
+      label: 'Idea strength',
+      detail: `${p.ideaStrength} × 50%`,
+      mathText: `Idea strength ${p.ideaStrength} × 50% = +${ideaPts}`,
+      points: ideaPts,
+      raw: p.ideaStrength,
+    },
+    {
+      label: 'Completeness',
+      detail: `${p.completeness} × 30%`,
+      mathText: `Completeness ${p.completeness} × 30% = +${compPts}`,
+      points: compPts,
+      raw: p.completeness,
+    },
+    {
+      label: 'Dormancy bonus',
+      detail: `${months} mo × 10 = ${dScore} × 20%`,
+      mathText: `Dormancy ${months} mo × 10 = ${dScore} × 20% = +${dormPts}`,
+      points: dormPts,
+      raw: dScore,
+    },
   ]
 }

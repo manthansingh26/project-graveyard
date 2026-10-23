@@ -47,7 +47,7 @@ test('loads old raw-array format seamlessly (silent migration)', () => {
 
 test('loads wrapped format with version', () => {
   const wrapped = {
-    version: 1,
+    version: 2,
     projects: [{ id: 'p2', title: 'Wrapped Project' }],
   }
   const storage = createFakeStorage({
@@ -56,6 +56,20 @@ test('loads wrapped format with version', () => {
 
   const loaded = loadProjects(storage)
   assert.deepEqual(loaded, wrapped.projects)
+})
+
+test('migrates schema version 1 to version 2 (adopter structure)', () => {
+  const v1Projects = [
+    { id: 'p1', title: 'Adopted Old', status: 'Adopted', adoptedBy: 'Alice', createdAt: '2026-01-01' },
+    { id: 'p2', title: 'Dormant Old', status: 'Dormant' },
+  ]
+  const storage = createFakeStorage({
+    [STORAGE_KEY]: JSON.stringify({ version: 1, projects: v1Projects }),
+  })
+  const loaded = loadProjects(storage)
+  assert.equal(loaded[0].adopter.name, 'Alice')
+  assert.equal(loaded[0].adopter.plan, '')
+  assert.equal(loaded[1].adopter, undefined)
 })
 
 test('corrupted data returns null without throwing', () => {

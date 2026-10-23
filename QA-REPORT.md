@@ -117,3 +117,29 @@ dist/assets/index-BWqlSvzK.js   429.39 kB │ gzip: 131.54 kB
   - Mobile touch targets ≥ 44px and responsive layouts tested across 360px to 1440px.
 - [x] **Pure Logic Tests**: 10/10 tests green in `src/score.test.js` and `src/utils.test.js`.
 - [x] **Lint & Build**: `oxlint` 0 warnings/0 errors, `vite build` 100% successful.
+
+---
+
+## Post-Release Surgical Optimizations & Fixes (Oct 23, 2026)
+
+Documenting the 4 targeted fixes applied to the release bundle:
+
+### 1. Fix 1 — Lazy-Load Heavy Libraries
+- **Problem**: `canvas-confetti` (~10.5 KB) and `html-to-image` (~12.5 KB) were statically imported in `src/App.jsx`, bloating the initial main bundle downloaded on first visit.
+- **Solution**: Removed static imports. Lazy-loaded `canvas-confetti` dynamically upon completing all revival plan tasks (`(await import('canvas-confetti')).default`) and `html-to-image` dynamically inside `exportShareCard` (`const { toPng } = await import('html-to-image')`).
+- **Bundle Size Impact**:
+  - **Before**: `dist/assets/index-CL-bA9Tk.js`: **467.64 kB** (gzip: 144.87 kB)
+  - **After**: Main bundle dropped to **447.17 kB** (gzip: 137.41 kB) — a direct **~20.5 kB (7.5 kB gzip)** reduction in initial bundle payload. `canvas-confetti` (10.57 kB) and `html-to-image` (12.50 kB) are now isolated in async on-demand chunks.
+
+### 2. Fix 2 — Honest Revival Radar Copy
+- **Problem**: The Revival Radar displayed a static placeholder string claiming unmeasured metrics (*"Signal is strong: active commits predicted, documentation 80% complete, community interest rising."*).
+- **Solution**: Replaced with dynamic, truthful copy derived directly from the radar candidate's real fields:
+  `Idea strength {radar.ideaStrength} · {radar.completeness}% built · dormant {radar.monthsDormant} months — the strongest revival candidate in the yard.`
+
+### 3. Fix 3 — Icon Consistency (Zap Icon)
+- **Problem**: Unicode character `⚡` remained in the card revival-plan progress strip and the Revival Plan modal section headers.
+- **Solution**: Replaced with the Lucide `Zap` icon (`strokeWidth={1.5}` / gold accent `#C8963E`) alongside Lucide `Check` icon for 100% completed plans, unifying icon aesthetics across the application.
+
+### 4. Fix 4 — README Test Count Alignment
+- **Problem**: `README.md` referenced 15 automated unit tests, while the test suite currently contains 17 automated tests.
+- **Solution**: Updated `README.md` to reference 17 automated unit tests across score, utils, and storage layers. All 17/17 tests passing green.

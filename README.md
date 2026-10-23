@@ -75,7 +75,7 @@ The application is structured into three clean, decoupled layers:
 ```bash
 npm install
 npm run dev       # http://localhost:5173
-npm test          # 15 automated unit tests across score, utils, and storage
+npm test          # 17 automated unit tests across score, utils, and storage
 npm run lint      # oxlint static analysis (0 warnings, 0 errors)
 npm run build     # production build → dist/
 npm run preview   # preview production build on http://localhost:4173

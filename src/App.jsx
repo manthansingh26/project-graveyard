@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import confetti from 'canvas-confetti'
-import { toPng } from 'html-to-image'
 import {
   Archive,
   Moon,
@@ -13,6 +11,7 @@ import {
   Sparkles,
   Share2,
   Check,
+  Zap,
 } from 'lucide-react'
 
 import { resurrectionScore, scoreBreakdown } from './score.js'
@@ -232,8 +231,18 @@ function TombstoneCard({ project, onOpen }) {
         <div className="h-8 mt-2 flex items-center">
           {plan.total > 0 ? (
             <div className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
-              <span className="font-semibold text-[#0B7A55] flex items-center gap-1 truncate">
-                {plan.allDone ? '✓ Revived Plan' : '⚡ Revival Plan'}
+              <span className="font-semibold text-[#0B7A55] flex items-center gap-1.5 truncate">
+                {plan.allDone ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-[#16A06B]" />
+                    <span>Revived Plan</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-[#C8963E]" />
+                    <span>Revival Plan</span>
+                  </>
+                )}
               </span>
               <span className="text-[#4D5E53] font-mono shrink-0">
                 {plan.completed}/{plan.total} ({plan.percent}%)
@@ -262,7 +271,10 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
       <div className="mt-5 bg-[#FAF6EE] border border-dashed border-[#E5DECD] rounded-2xl p-4.5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-sm tracking-wide text-[#0B7A55]">⚡ REVIVAL PLAN</h3>
+            <h3 className="font-bold text-sm tracking-wide text-[#0B7A55] flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-[#C8963E]" />
+              <span>REVIVAL PLAN</span>
+            </h3>
             <p className="text-xs text-[#4D5E53] mt-0.5">
               Turn unfinished autopsy items into an actionable checklist. Choose a fate above or generate now.
             </p>
@@ -322,7 +334,10 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="font-bold text-sm tracking-wide text-[#0B7A55] flex items-center gap-2">
-            <span>⚡ REVIVAL PLAN</span>
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-[#C8963E]" />
+              <span>REVIVAL PLAN</span>
+            </span>
             {progress.allDone && (
               <span className="text-[10px] bg-[#16A06B] text-white font-extrabold px-2 py-0.5 rounded-full">
                 REVIVED ✓
@@ -497,6 +512,7 @@ function AutopsyView({
     if (!shareCardRef.current || sharing) return
     setSharing(true)
     try {
+      const { toPng } = await import('html-to-image')
       const dataUrl = await toPng(shareCardRef.current, {
         width: 1200,
         height: 630,
@@ -1916,7 +1932,7 @@ export function AppContent() {
     notify(`Revival Plan generated with ${plan.tasks.length} milestones.`)
   }
 
-  const handleUpdatePlan = (project, newPlan) => {
+  const handleUpdatePlan = async (project, newPlan) => {
     const progress = calculatePlanProgress(newPlan.tasks)
     let reachedCompletion = false
 
@@ -1942,12 +1958,17 @@ export function AppContent() {
     })
 
     if (reachedCompletion) {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#16A06B', '#C8963E', '#F7ECD2'],
-      })
+      try {
+        const confetti = (await import('canvas-confetti')).default
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#16A06B', '#C8963E', '#F7ECD2'],
+        })
+      } catch {
+        // dynamic import fallback
+      }
       notify('🎉 All revival milestones finished! Project marked Revived ✓')
     }
   }
@@ -2102,6 +2123,12 @@ export function AppContent() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={promptResetDemo}
+              className="border border-[#E5DECD] bg-white px-3.5 py-1.5 rounded-full text-xs font-medium text-[#4D5E53] hover:text-[#7D2D20] hover:bg-[#FDF2F0] cursor-pointer transition-colors"
+            >
+              Reset demo
+            </button>
             <button
               onClick={exportJSON}
               className="hidden sm:inline-block border border-[#E5DECD] bg-white px-3.5 py-1.5 rounded-full text-xs font-medium text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer"
@@ -2267,7 +2294,7 @@ export function AppContent() {
                     <span className="text-base font-sans font-normal text-[#4D5E53]">/ 100</span>
                   </div>
                   <p className="text-xs sm:text-sm text-[#4D5E53] mt-1.5 max-w-xl leading-relaxed">
-                    Signal is strong: active commits predicted, documentation 80% complete, community interest rising.
+                    Idea strength {radar.ideaStrength} · {radar.completeness}% built · dormant {radar.monthsDormant} months — the strongest revival candidate in the yard.
                   </p>
                 </div>
               </div>

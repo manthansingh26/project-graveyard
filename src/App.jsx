@@ -1,17 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import confetti from 'canvas-confetti'
+import { toPng } from 'html-to-image'
+import {
+  Archive,
+  Moon,
+  Sprout,
+  HeartHandshake,
+  Star,
+  FileText,
+  Compass,
+  Sparkles,
+  Share2,
+  Check,
+} from 'lucide-react'
 
 import { resurrectionScore, scoreBreakdown } from './score.js'
 import {
   parseGitHubRepo,
   monthsSince,
+  timeAgo,
   calculatePlanProgress,
   buildRevivalPlan,
   calculateGraveyardInsights,
   mergeActivityFeed,
 } from './utils.js'
-
-const STORAGE_KEY = 'project-graveyard-v1'
+import { loadProjects, saveProjects, clearProjects } from './storage.js'
 
 const now = () => new Date().toISOString().slice(0, 10)
 
@@ -83,38 +97,51 @@ const FATES = [
 ]
 
 const STATUS_STYLE = {
-  Dormant: 'bg-zinc-700/60 text-zinc-200 border border-zinc-600/40',
-  Resurrected: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-  Revived: 'bg-emerald-400 text-black font-bold shadow-sm shadow-emerald-500/40 border border-emerald-300',
-  Archived: 'bg-zinc-800 text-zinc-500 border border-zinc-700/40',
-  Adopted: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
-}
-
-function loadProjects() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch { /* fall through to seed */ }
-  return SEED
+  Dormant: 'bg-[#F3EEE2] text-[#4D5E53] border border-[#E5DECD]',
+  Resurrected: 'bg-[#E2F3EA] text-[#0B7A55] border border-[#A7D7C5]',
+  Revived: 'bg-[#16A06B] text-white font-bold shadow-xs',
+  Archived: 'bg-[#F3EEE2] text-[#8A9A8E] border border-[#E5DECD]',
+  Adopted: 'bg-[#F7ECD2] text-[#8A6414] border border-[#E5C98A]',
 }
 
 function linesToList(text) {
   return text.split('\n').map((s) => s.trim()).filter(Boolean)
 }
 
+function GitHubIcon({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+      />
+    </svg>
+  )
+}
+
 function ScoreRing({ score, size = 64 }) {
-  const color = score >= 80 ? '#34d399' : score >= 60 ? '#f2c14e' : '#9db4a8'
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} aria-label={`Resurrection score ${score}`}>
       <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#26332d" strokeWidth="3.4" />
-        <circle cx="18" cy="18" r="15.9" fill="none" stroke={color} strokeWidth="3.4" strokeLinecap="round"
-          strokeDasharray={`${score} ${100 - score}`} />
+        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#F3EEE2" strokeWidth="3" />
+        <circle
+          cx="18"
+          cy="18"
+          r="15.9"
+          fill="none"
+          stroke="#C8963E"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={`${score} ${100 - score}`}
+        />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center font-bold" style={{ color, fontSize: size * 0.3 }}>{score}</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="font-display font-black text-[#8A6414] leading-none" style={{ fontSize: size * 0.32 }}>
+          {score}
+        </span>
+        <span className="text-[8px] font-sans text-[#4D5E53] leading-none mt-0.5">/100</span>
+      </div>
     </div>
   )
 }
@@ -129,56 +156,96 @@ function TombstoneCard({ project, onOpen }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      whileHover={{ y: -4 }}
       onClick={() => onOpen(project)}
-      className="tombstone grave-glow text-left w-full bg-[#182420] border border-[#26332d] px-5 pt-7 pb-5 transition-all cursor-pointer"
+      className="tombstone-card text-left w-full bg-white border border-[#E5DECD] rounded-[24px] p-5 cursor-pointer flex flex-col justify-between h-full"
     >
-      <div className="flex items-start justify-between gap-3">
-        <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${STATUS_STYLE[project.status] || STATUS_STYLE.Dormant}`}>
-          {project.status === 'Revived' ? 'Revived ✓' : project.status}
-        </span>
-        <ScoreRing score={score} size={58} />
-      </div>
-
-      <h3 className="text-lg font-bold leading-snug mt-2 break-words">{project.title}</h3>
-      <p className="text-sm text-[#9db4a8] italic mt-1 break-words">“{project.epitaph}”</p>
-
-      <div className="flex flex-wrap gap-1.5 mt-3">
-        {project.tags.map((t) => (
-          <span key={t} className="text-[11px] px-2 py-0.5 rounded-full bg-[#0b0f0e] border border-[#26332d] text-[#9db4a8]">{t}</span>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap gap-x-3 gap-y-1 items-center justify-between mt-4 text-xs text-[#9db4a8]">
-        <span>💤 Dormant {project.monthsDormant} mo</span>
-        {score >= 80 && project.status === 'Dormant' && <span className="text-emerald-300 font-bold">⚡ Revival ready</span>}
-        {project.adoptable && project.status === 'Dormant' && <span className="text-amber-300 font-semibold">Adoptable</span>}
-        {project.status === 'Adopted' && <span className="text-amber-300">by {project.adoptedBy}</span>}
-      </div>
-
-      {/* Built completeness bar */}
-      <div className="mt-3 h-1.5 rounded-full bg-[#0b0f0e] overflow-hidden">
-        <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${project.completeness}%` }} />
-      </div>
-      <p className="text-[11px] text-[#9db4a8] mt-1">{project.completeness}% built — tap for the autopsy</p>
-
-      {/* Revival Plan Progress Bar on card */}
-      {plan.total > 0 && (
-        <div className="mt-3.5 bg-[#0e1613] border border-emerald-500/25 rounded-xl px-3 py-2">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-semibold text-emerald-300 flex items-center gap-1">
-              {plan.allDone ? '✓ Revived Plan' : '⚡ Revival Plan'}
+      <div>
+        {/* Arched Top Section */}
+        <div className="tombstone-arch-head p-4 pb-5 border border-[#E5DECD]/70 flex flex-col items-center justify-center text-center relative">
+          <div className="absolute top-3 left-3">
+            <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full ${STATUS_STYLE[project.status] || STATUS_STYLE.Dormant}`}>
+              {project.status === 'Revived' ? 'Revived ✓' : project.status}
             </span>
-            <span className="text-[#cfe0d6] font-mono text-[11px]">{plan.completed}/{plan.total} ({plan.percent}%)</span>
           </div>
-          <div className="h-1.5 rounded-full bg-[#182420] overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-300 ${plan.allDone ? 'bg-emerald-300' : 'bg-emerald-400'}`}
-              style={{ width: `${plan.percent}%` }}
-            />
+
+          <div className="mt-4 mb-1">
+            <ScoreRing score={score} size={64} />
+          </div>
+
+          <div className="text-[10px] uppercase font-bold tracking-widest text-[#8A6414] mt-1">
+            Resurrection Score
           </div>
         </div>
-      )}
+
+        {/* Title and Epitaph */}
+        <div className="px-1 mt-4">
+          <h3 className="font-display text-xl font-bold leading-tight text-[#1F2A24] break-words">
+            {project.title}
+          </h3>
+
+          {/* Thin gold gradient divider */}
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-[#C8963E]/45 to-transparent my-2" />
+
+          <p className="text-sm text-[#4D5E53] italic break-words line-clamp-2">
+            “{project.epitaph}”
+          </p>
+        </div>
+
+        {/* Badges & Tags */}
+        <div className="px-1 flex flex-wrap items-center gap-1.5 mt-3">
+          {score >= 80 && project.status === 'Dormant' && (
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#E2F3EA] text-[#0B7A55]">
+              Revival-Ready
+            </span>
+          )}
+          {project.adoptable && project.status === 'Dormant' && (
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F7ECD2] text-[#8A6414]">
+              Adoptable
+            </span>
+          )}
+          {project.tags.map((t) => (
+            <span
+              key={t}
+              className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#F3EEE2] border border-[#E5DECD] text-[#4D5E53]"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer Row (fixed layout to ensure equal card heights) */}
+      <div className="mt-5 pt-3.5 border-t border-[#E5DECD]/70 px-1">
+        <div className="h-1.5 rounded-full bg-[#EFEAD9] overflow-hidden">
+          <div
+            className="h-full bg-[#16A06B] rounded-full transition-all duration-300"
+            style={{ width: `${project.completeness}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between mt-2 text-xs text-[#4D5E53]">
+          <span>{project.completeness}% built • Dormant {project.monthsDormant} mo</span>
+          <span className="font-semibold text-[#16A06B] hover:underline">View autopsy →</span>
+        </div>
+
+        {/* Dedicated slot for revival plan progress inside footer */}
+        <div className="h-8 mt-2 flex items-center">
+          {plan.total > 0 ? (
+            <div className="w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-lg px-2.5 py-1 flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-[#0B7A55] flex items-center gap-1 truncate">
+                {plan.allDone ? '✓ Revived Plan' : '⚡ Revival Plan'}
+              </span>
+              <span className="text-[#4D5E53] font-mono shrink-0">
+                {plan.completed}/{plan.total} ({plan.percent}%)
+              </span>
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#8A9A8E] italic">
+              Tap card to inspect vision & reasons
+            </div>
+          )}
+        </div>
+      </div>
     </motion.button>
   )
 }
@@ -192,19 +259,19 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
 
   if (!plan) {
     return (
-      <div className="mt-4 bg-[#0b0f0e] border border-dashed border-[#26332d] rounded-2xl p-4">
+      <div className="mt-5 bg-[#FAF6EE] border border-dashed border-[#E5DECD] rounded-2xl p-4.5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-sm tracking-wide text-emerald-300">⚡ REVIVAL PLAN</h3>
-            <p className="text-xs text-[#9db4a8] mt-0.5">
-              Turn unfinished items into an actionable revival checklist. Choose a fate above or generate now.
+            <h3 className="font-bold text-sm tracking-wide text-[#0B7A55]">⚡ REVIVAL PLAN</h3>
+            <p className="text-xs text-[#4D5E53] mt-0.5">
+              Turn unfinished autopsy items into an actionable checklist. Choose a fate above or generate now.
             </p>
           </div>
           <button
             onClick={() => onGeneratePlan(project)}
-            className="shimmer-btn bg-emerald-400 text-black text-xs font-bold px-4 py-2 rounded-xl shrink-0 cursor-pointer"
+            className="bg-[#16A06B] hover:bg-[#128256] text-white text-xs font-bold px-4 py-2 rounded-full shrink-0 shadow-xs cursor-pointer"
           >
-            <span className="relative z-[2]">Generate Revival Plan</span>
+            Generate Revival Plan
           </button>
         </div>
       </div>
@@ -251,60 +318,55 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
   }
 
   return (
-    <div className="mt-4 bg-[#0b0f0e] border border-emerald-500/30 rounded-2xl p-4">
+    <div className="mt-5 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-5 card-shadow">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="font-bold text-sm tracking-wide text-emerald-300 flex items-center gap-2">
+          <h3 className="font-bold text-sm tracking-wide text-[#0B7A55] flex items-center gap-2">
             <span>⚡ REVIVAL PLAN</span>
             {progress.allDone && (
-              <span className="text-[10px] bg-emerald-400 text-black font-extrabold px-2 py-0.5 rounded-full">
+              <span className="text-[10px] bg-[#16A06B] text-white font-extrabold px-2 py-0.5 rounded-full">
                 REVIVED ✓
               </span>
             )}
           </h3>
-          <p className="text-xs text-[#9db4a8] mt-0.5">
+          <p className="text-xs text-[#4D5E53] mt-0.5">
             Auto-built from unfinished autopsy items. Check them off to revive this build.
           </p>
         </div>
         <div className="text-right">
-          <span className="text-sm font-bold text-emerald-300 font-mono">
+          <span className="text-sm font-bold text-[#0B7A55] font-mono">
             {progress.completed}/{progress.total}
           </span>
-          <span className="text-xs text-[#9db4a8] ml-1">({progress.percent}%)</span>
+          <span className="text-xs text-[#4D5E53] ml-1">({progress.percent}%)</span>
         </div>
       </div>
 
-      {/* Progress Bar */}
-      <div className="mt-3 h-2 rounded-full bg-[#182420] overflow-hidden">
+      <div className="mt-3 h-2 rounded-full bg-[#EFEAD9] overflow-hidden">
         <div
-          className={`h-full rounded-full transition-all duration-300 ${
-            progress.allDone ? 'bg-gradient-to-r from-emerald-400 to-teal-300' : 'bg-emerald-400'
-          }`}
+          className="h-full rounded-full transition-all duration-300 bg-[#16A06B]"
           style={{ width: `${progress.percent}%` }}
         />
       </div>
 
-      {/* Completion Banner */}
       {progress.allDone && (
-        <div className="mt-3 bg-emerald-500/15 border border-emerald-400/40 rounded-xl p-3 text-center">
-          <p className="text-sm font-bold text-emerald-300">
+        <div className="mt-3.5 bg-[#E2F3EA] border border-[#A7D7C5] rounded-xl p-3 text-center">
+          <p className="text-sm font-bold text-[#0B7A55]">
             🎉 All tasks completed! This project is officially <span className="underline">Revived ✓</span>
           </p>
-          <p className="text-xs text-[#9db4a8] mt-0.5">
+          <p className="text-xs text-[#4D5E53] mt-0.5">
             Recorded in the graveyard archives. Your past effort produced real software.
           </p>
         </div>
       )}
 
-      {/* Task List */}
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3.5 space-y-2">
         {plan.tasks.map((task) => (
           <li
             key={task.id}
-            className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-colors ${
+            className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors ${
               task.done
-                ? 'bg-[#121a17]/50 border-emerald-500/20 text-[#7a9385]'
-                : 'bg-[#182420] border-[#26332d] text-[#e8f0ea]'
+                ? 'bg-[#F3EEE2] border-[#E5DECD] text-[#8A9A8E]'
+                : 'bg-white border-[#E5DECD] text-[#1F2A24] shadow-2xs'
             }`}
           >
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -312,7 +374,6 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
                 type="checkbox"
                 checked={task.done}
                 onChange={() => handleToggleTask(task.id)}
-                className="w-4 h-4 accent-emerald-400 rounded cursor-pointer shrink-0"
               />
               {editingId === task.id ? (
                 <div className="flex items-center gap-2 flex-1">
@@ -325,17 +386,17 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
                       if (e.key === 'Escape') setEditingId(null)
                     }}
                     autoFocus
-                    className="flex-1 bg-[#0b0f0e] border border-emerald-400 rounded-lg px-2 py-1 text-xs text-white"
+                    className="flex-1 bg-white border border-[#16A06B] rounded-lg px-2.5 py-1 text-xs text-[#1F2A24]"
                   />
                   <button
                     onClick={() => handleSaveEdit(task.id)}
-                    className="text-xs bg-emerald-400 text-black px-2 py-1 rounded font-bold cursor-pointer"
+                    className="text-xs bg-[#16A06B] text-white px-2.5 py-1 rounded-full font-bold cursor-pointer"
                   >
                     Save
                   </button>
                   <button
                     onClick={() => setEditingId(null)}
-                    className="text-xs text-[#9db4a8] hover:text-white px-1 cursor-pointer"
+                    className="text-xs text-[#4D5E53] hover:text-[#1F2A24] px-1 cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -344,7 +405,7 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
                 <span
                   onClick={() => handleToggleTask(task.id)}
                   className={`text-xs break-words cursor-pointer select-none ${
-                    task.done ? 'line-through text-[#8fa79a]' : 'font-medium'
+                    task.done ? 'line-through text-[#8A9A8E]' : 'font-medium'
                   }`}
                 >
                   {task.text}
@@ -356,14 +417,14 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => handleStartEdit(task)}
-                  className="text-[11px] text-[#9db4a8] hover:text-emerald-300 px-1.5 py-0.5 rounded cursor-pointer"
+                  className="text-xs text-[#4D5E53] hover:text-[#16A06B] px-1.5 py-0.5 rounded cursor-pointer"
                   title="Edit task"
                 >
                   ✎
                 </button>
                 <button
                   onClick={() => handleDeleteTask(task.id)}
-                  className="text-[11px] text-[#9db4a8] hover:text-red-300 px-1.5 py-0.5 rounded cursor-pointer"
+                  className="text-xs text-[#4D5E53] hover:text-[#BC3F26] px-1.5 py-0.5 rounded cursor-pointer"
                   title="Remove task"
                 >
                   ✕
@@ -374,18 +435,17 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
         ))}
       </ul>
 
-      {/* Add Task Input */}
-      <form onSubmit={handleAddTask} className="flex gap-2 mt-3">
+      <form onSubmit={handleAddTask} className="flex gap-2 mt-3.5">
         <input
           value={newTaskText}
           onChange={(e) => setNewTaskText(e.target.value)}
           placeholder="+ Add another revival milestone…"
-          className="flex-1 bg-[#121a17] border border-[#26332d] rounded-xl px-3 py-1.5 text-xs text-[#e8f0ea] placeholder-[#6b8277]"
+          className="flex-1 bg-white border border-[#E5DECD] rounded-xl px-3.5 py-2 text-xs text-[#1F2A24] placeholder-[#8A9A8E]"
         />
         <button
           type="submit"
           disabled={!newTaskText.trim()}
-          className="bg-emerald-400 text-black font-bold text-xs px-3 py-1.5 rounded-xl disabled:opacity-40 cursor-pointer"
+          className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold text-xs px-4 py-2 rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
         >
           Add
         </button>
@@ -400,14 +460,17 @@ function AutopsyView({
   onFate,
   onAdopt,
   onToggleAdoptable,
-  onDelete,
+  onDeleteRequest,
   onUpdatePlan,
   onGeneratePlan,
+  onNotify,
 }) {
   const score = resurrectionScore(project)
   const breakdown = scoreBreakdown(project)
   const [adopter, setAdopter] = useState('')
   const [copied, setCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const shareCardRef = useRef(null)
 
   const copySummary = async () => {
     const text = [
@@ -423,48 +486,85 @@ function AutopsyView({
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
+      onNotify('Autopsy summary copied to clipboard.')
       setTimeout(() => setCopied(false), 2000)
-    } catch { setCopied(false) }
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  const exportShareCard = async () => {
+    if (!shareCardRef.current || sharing) return
+    setSharing(true)
+    try {
+      const dataUrl = await toPng(shareCardRef.current, {
+        width: 1200,
+        height: 630,
+        cacheBust: true,
+      })
+      const link = document.createElement('a')
+      link.download = `${project.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-tombstone.png`
+      link.href = dataUrl
+      link.click()
+      onNotify('Tombstone image exported (1200×630).')
+    } catch (err) {
+      console.error(err)
+      onNotify('Failed to generate image.')
+    } finally {
+      setSharing(false)
+    }
   }
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-6"
+      className="fixed inset-0 z-50 bg-[rgba(20,32,26,0.45)] backdrop-blur-[6px] flex items-end sm:items-center justify-center p-0 sm:p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
+        initial={{ scale: 0.96, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#121a17] border border-[#26332d] w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl"
+        className="bg-white border border-[#E5DECD] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl card-shadow text-[#1F2A24] relative overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-label={`Autopsy of ${project.title}`}
       >
-        <div className="flex items-start justify-between gap-4">
+        {/* Modal Header */}
+        <div className="p-6 sm:p-7 pb-4 border-b border-[#E5DECD]/60 flex items-start justify-between gap-4 shrink-0 bg-white z-10">
           <div>
-            <span className={`text-[11px] px-2.5 py-1 rounded-full font-semibold ${STATUS_STYLE[project.status] || STATUS_STYLE.Dormant}`}>
+            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold ${STATUS_STYLE[project.status] || STATUS_STYLE.Dormant}`}>
               {project.status === 'Revived' ? 'Revived ✓' : project.status}
             </span>
-            <h2 className="text-2xl font-bold mt-2 break-words">{project.title}</h2>
-            <p className="text-[#9db4a8] italic break-words">“{project.epitaph}”</p>
+            <h2 className="font-display text-2xl sm:text-3xl font-black mt-2 text-[#1F2A24] break-words">
+              {project.title}
+            </h2>
+            <p className="text-[#4D5E53] italic break-words">“{project.epitaph}”</p>
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={copySummary}
-                className="text-xs border border-[#26332d] px-3 py-1.5 rounded-full cursor-pointer hover:bg-[#182420] transition-colors"
+                className="text-xs border border-[#E5DECD] bg-[#FAF6EE] text-[#1F2A24] px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-[#F3EEE2] transition-colors"
               >
                 {copied ? '✓ Copied' : 'Copy summary'}
+              </button>
+              <button
+                onClick={exportShareCard}
+                disabled={sharing}
+                className="text-xs border border-[#E5DECD] bg-[#FAF6EE] text-[#1F2A24] px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-[#F3EEE2] flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <Share2 className="w-3.5 h-3.5 text-[#C8963E]" />
+                <span>{sharing ? 'Generating…' : 'Share tombstone'}</span>
               </button>
               {project.repoUrl && (
                 <a
                   href={project.repoUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs border border-[#26332d] px-3 py-1.5 rounded-full hover:bg-[#182420] transition-colors"
+                  className="text-xs border border-[#E5DECD] bg-[#FAF6EE] text-[#1F2A24] px-3.5 py-1.5 rounded-full hover:bg-[#F3EEE2] transition-colors"
                 >
                   View repository ↗
                 </a>
@@ -473,133 +573,267 @@ function AutopsyView({
           </div>
           <button
             onClick={onClose}
-            className="text-2xl leading-none px-2 text-[#9db4a8] hover:text-white cursor-pointer"
+            className="text-2xl leading-none px-2 text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
             aria-label="Close autopsy"
           >
             ×
           </button>
         </div>
 
-        {/* The Autopsy Record */}
-        <div className="mt-5 bg-[#0b0f0e] border border-[#26332d] rounded-2xl p-4">
-          <h3 className="font-bold text-sm tracking-wide text-[#9db4a8]">THE AUTOPSY</h3>
-          <p className="mt-2 text-sm"><span className="text-[#9db4a8] font-semibold">Original vision: </span>{project.vision}</p>
-          <div className="grid sm:grid-cols-2 gap-4 mt-3">
-            <div>
-              <p className="text-sm font-semibold text-emerald-300">✓ What was built</p>
-              <ul className="text-sm text-[#cfe0d6] list-disc ml-5 mt-1 space-y-0.5">
-                {project.built.map((b) => <li key={b}>{b}</li>)}
-              </ul>
+        {/* Modal Scrollable Body */}
+        <div className="modal-scrollbar overflow-y-auto p-6 sm:p-7 pt-4 flex-1">
+          {/* Autopsy Record */}
+          <div className="bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-5">
+            <h3 className="font-bold text-xs tracking-wider uppercase text-[#8A6414]">THE AUTOPSY</h3>
+            <p className="mt-2 text-sm text-[#1F2A24]">
+              <span className="text-[#4D5E53] font-semibold">Original vision: </span>
+              {project.vision}
+            </p>
+            <div className="grid sm:grid-cols-2 gap-4 mt-3.5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#0B7A55]">✓ What was built</p>
+                <ul className="text-sm text-[#1F2A24] list-disc ml-5 mt-1 space-y-0.5">
+                  {project.built.map((b) => <li key={b}>{b}</li>)}
+                </ul>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-[#8A6414]">○ Still unfinished</p>
+                <ul className="text-sm text-[#1F2A24] list-disc ml-5 mt-1 space-y-0.5">
+                  {project.unfinished.map((b) => <li key={b}>{b}</li>)}
+                </ul>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-amber-300">○ Still unfinished</p>
-              <ul className="text-sm text-[#cfe0d6] list-disc ml-5 mt-1 space-y-0.5">
-                {project.unfinished.map((b) => <li key={b}>{b}</li>)}
-              </ul>
+
+            <div className="mt-4 p-3.5 bg-[#FBF8F1] border-l-4 border-[#C8963E] rounded-r-xl">
+              <p className="text-sm text-[#1F2A24] italic font-display">
+                <span className="font-sans font-bold not-italic text-xs uppercase tracking-wider text-[#8A6414] block mb-1">
+                  Honest reason work stopped:
+                </span>
+                “{project.reason}”
+              </p>
             </div>
           </div>
-          <p className="mt-3 text-sm"><span className="text-[#9db4a8] font-semibold">Honest reason work stopped: </span>{project.reason}</p>
+
+          {/* Resurrection Score Breakdown */}
+          <div className="mt-5 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-5 flex flex-col sm:flex-row gap-5 items-center">
+            <ScoreRing score={score} size={84} />
+            <div className="flex-1 w-full">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-[#8A6414]">
+                RESURRECTION SCORE — {score}/100
+              </h3>
+              {breakdown.map((b) => (
+                <div key={b.label} className="mt-2.5">
+                  <div className="flex justify-between text-xs text-[#4D5E53]">
+                    <span className="font-medium">{b.label}</span>
+                    <span className="font-mono text-[#1F2A24] font-semibold">
+                      {b.raw} × {b.weight} = +{b.points}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[#E5DECD] mt-1">
+                    <div className="h-full bg-[#C8963E] rounded-full" style={{ width: `${b.raw}%` }} />
+                  </div>
+                </div>
+              ))}
+              <p className="text-[11px] text-[#4D5E53] mt-2.5 leading-relaxed">
+                Formula: 50% idea strength + 30% completeness + 20% dormancy bonus (10 pts/month away, max 100 — distance gives fresh eyes).
+              </p>
+            </div>
+          </div>
+
+          {/* Revival Plan Section */}
+          <RevivalPlanSection
+            project={project}
+            onUpdatePlan={onUpdatePlan}
+            onGeneratePlan={onGeneratePlan}
+          />
+
+          {/* Adopt a Grave */}
+          <div className="mt-5 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-5">
+            <h3 className="font-bold text-xs uppercase tracking-wider text-[#8A6414]">ADOPT A GRAVE</h3>
+            {project.status === 'Adopted' ? (
+              <p className="text-sm mt-1 text-[#1F2A24]">
+                This project was adopted by <b className="text-[#8A6414]">{project.adoptedBy}</b>. It gets a second life with a new builder.
+              </p>
+            ) : project.adoptable ? (
+              <div className="flex flex-col sm:flex-row gap-2 mt-2.5">
+                <input
+                  value={adopter}
+                  onChange={(e) => setAdopter(e.target.value)}
+                  placeholder="Your name — claim this project"
+                  className="flex-1 bg-white border border-[#E5DECD] rounded-xl px-3.5 py-2 text-sm text-[#1F2A24]"
+                />
+                <button
+                  disabled={!adopter.trim()}
+                  onClick={() => onAdopt(project, adopter.trim())}
+                  className="bg-[#C8963E] hover:bg-[#B3822F] text-white font-bold text-sm px-5 py-2 rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
+                >
+                  Adopt this project
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm mt-1 text-[#4D5E53]">Not marked adoptable yet.</p>
+            )}
+            <button
+              onClick={() => onToggleAdoptable(project)}
+              className="text-xs underline text-[#4D5E53] hover:text-[#1F2A24] mt-2.5 cursor-pointer block"
+            >
+              {project.adoptable ? 'Remove from adoption list' : 'Mark as adoptable'}
+            </button>
+          </div>
+
+          {/* Archive Log */}
+          {project.log.length > 0 && (
+            <div className="mt-5">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-[#4D5E53]">ARCHIVE LOG</h3>
+              <ul className="text-sm mt-2 space-y-1.5 border-l-2 border-[#E5DECD] pl-3.5 ml-1">
+                {[...project.log].reverse().map((l, i) => (
+                  <li key={i} className="text-[#1F2A24]">
+                    <span className="text-[#4D5E53] font-mono text-xs mr-1">{l.date} —</span>
+                    {l.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Permanent Delete */}
+          <div className="mt-6 pt-4 border-t border-[#E5DECD] flex items-center justify-between pb-2">
+            <span className="text-xs text-[#4D5E53]">Buried {project.createdAt}</span>
+            <button
+              onClick={() => onDeleteRequest(project)}
+              className="text-xs text-[#BC3F26] hover:underline cursor-pointer font-medium"
+            >
+              Remove this grave permanently
+            </button>
+          </div>
         </div>
 
-        {/* Resurrection Score Breakdown */}
-        <div className="mt-4 bg-[#0b0f0e] border border-[#26332d] rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center">
-          <ScoreRing score={score} size={84} />
-          <div className="flex-1 w-full">
-            <h3 className="font-bold text-sm tracking-wide text-[#9db4a8]">RESURRECTION SCORE — {score}/100</h3>
-            {breakdown.map((b) => (
-              <div key={b.label} className="mt-2">
-                <div className="flex justify-between text-xs text-[#9db4a8]">
-                  <span>{b.label} ({b.weight})</span>
-                  <span>{b.raw} → +{b.points}</span>
+        {/* Sticky Bottom Bar for Choosing Fate */}
+        <div className="p-4 sm:p-5 border-t border-[#E5DECD] bg-[#FAF6EE] shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#8A6414]">
+              Choose Fate:
+            </span>
+            <span className="text-xs text-[#4D5E53]">Select an action to update project status</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {FATES.map((f) => {
+              const isContinue = f.key === 'Continue'
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => onFate(project, f.key)}
+                  className={`p-2.5 rounded-xl text-center cursor-pointer transition-all ${
+                    isContinue
+                      ? 'bg-[#16A06B] hover:bg-[#128256] text-white shadow-xs font-bold'
+                      : 'bg-white hover:bg-[#F3EEE2] border border-[#E5DECD] text-[#1F2A24] font-medium'
+                  }`}
+                >
+                  <span className="text-sm block">{f.icon} {f.key}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Off-screen 1200x630 share card target for export */}
+        <div style={{ position: 'fixed', left: -9999, top: -9999, pointerEvents: 'none' }}>
+          <div
+            ref={shareCardRef}
+            style={{
+              width: 1200,
+              height: 630,
+              backgroundColor: '#FAF6EE',
+              color: '#1F2A24',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              padding: 60,
+              fontFamily: '"Space Grotesk", sans-serif',
+              boxSizing: 'border-box',
+              border: '12px solid #E5DECD',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 36 }}>🪦</span>
+                <span style={{ fontFamily: '"Fraunces", serif', fontSize: 28, fontWeight: 900 }}>
+                  The Project Graveyard
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                  color: '#8A6414',
+                }}
+              >
+                Rest in progress
+              </span>
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ maxWidth: 800 }}>
+                  <h1
+                    style={{
+                      fontFamily: '"Fraunces", serif',
+                      fontSize: 52,
+                      fontWeight: 900,
+                      lineHeight: 1.1,
+                      margin: 0,
+                    }}
+                  >
+                    {project.title}
+                  </h1>
+                  <p
+                    style={{
+                      fontSize: 24,
+                      fontStyle: 'italic',
+                      color: '#4D5E53',
+                      marginTop: 16,
+                    }}
+                  >
+                    “{project.epitaph}”
+                  </p>
                 </div>
-                <div className="h-1.5 rounded-full bg-[#26332d] mt-0.5">
-                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${b.raw}%` }} />
+
+                <div
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '3px solid #C8963E',
+                    borderRadius: 30,
+                    padding: '24px 36px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#8A6414', letterSpacing: '0.1em' }}>
+                    RESURRECTION SCORE
+                  </div>
+                  <div style={{ fontFamily: '"Fraunces", serif', fontSize: 64, fontWeight: 900, color: '#C8963E' }}>
+                    {score}
+                    <span style={{ fontSize: 24, color: '#4D5E53' }}>/100</span>
+                  </div>
                 </div>
               </div>
-            ))}
-            <p className="text-[11px] text-[#9db4a8] mt-2">
-              Formula: 50% idea strength + 30% completeness + 20% dormancy bonus (10 pts/month away, max 100 — distance gives fresh eyes).
-            </p>
-          </div>
-        </div>
-
-        {/* Choose Its Fate */}
-        <div className="mt-4">
-          <h3 className="font-bold text-sm tracking-wide text-[#9db4a8]">CHOOSE ITS FATE</h3>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {FATES.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => onFate(project, f.key)}
-                className="text-left bg-[#182420] hover:bg-[#1f2f28] border border-[#26332d] rounded-xl p-3 cursor-pointer transition-colors"
-              >
-                <span className="font-bold text-sm">{f.icon} {f.key}</span>
-                <span className="block text-xs text-[#9db4a8] mt-0.5">{f.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Revival Plan Section */}
-        <RevivalPlanSection
-          project={project}
-          onUpdatePlan={onUpdatePlan}
-          onGeneratePlan={onGeneratePlan}
-        />
-
-        {/* Adopt a Grave */}
-        <div className="mt-4 bg-[#0b0f0e] border border-amber-500/30 rounded-2xl p-4">
-          <h3 className="font-bold text-sm tracking-wide text-amber-300">ADOPT A GRAVE</h3>
-          {project.status === 'Adopted' ? (
-            <p className="text-sm mt-1">This project was adopted by <b>{project.adoptedBy}</b>. It gets a second life with a new builder.</p>
-          ) : project.adoptable ? (
-            <div className="flex flex-col sm:flex-row gap-2 mt-2">
-              <input
-                value={adopter}
-                onChange={(e) => setAdopter(e.target.value)}
-                placeholder="Your name — claim this project"
-                className="flex-1 bg-[#121a17] border border-[#26332d] rounded-xl px-3 py-2 text-sm"
-              />
-              <button
-                disabled={!adopter.trim()}
-                onClick={() => onAdopt(project, adopter.trim())}
-                className="bg-amber-400 text-black font-bold text-sm px-4 py-2 rounded-xl disabled:opacity-40 cursor-pointer"
-              >
-                Adopt this project
-              </button>
             </div>
-          ) : (
-            <p className="text-sm mt-1 text-[#9db4a8]">Not marked adoptable yet.</p>
-          )}
-          <button
-            onClick={() => onToggleAdoptable(project)}
-            className="text-xs underline text-[#9db4a8] mt-2 cursor-pointer"
-          >
-            {project.adoptable ? 'Remove from adoption list' : 'Mark as adoptable'}
-          </button>
-        </div>
 
-        {/* Archive Log */}
-        {project.log.length > 0 && (
-          <div className="mt-5">
-            <h3 className="font-bold text-sm tracking-wide text-[#9db4a8]">ARCHIVE LOG</h3>
-            <ul className="text-sm mt-2 space-y-1.5 border-l-2 border-[#26332d] pl-3 ml-1">
-              {[...project.log].reverse().map((l, i) => (
-                <li key={i} className="text-[#cfe0d6]">
-                  <span className="text-[#9db4a8] font-mono text-xs mr-1">{l.date} —</span>
-                  {l.text}
-                </li>
-              ))}
-            </ul>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                borderTop: '2px solid #E5DECD',
+                paddingTop: 24,
+                fontSize: 18,
+                color: '#4D5E53',
+              }}
+            >
+              <span>{project.completeness}% built • Dormant {project.monthsDormant} months</span>
+              <span style={{ fontStyle: 'italic' }}>Every unfinished project deserves a second chance.</span>
+            </div>
           </div>
-        )}
-
-        {/* Delete */}
-        <div className="mt-6 pt-4 border-t border-[#26332d] flex items-center justify-between">
-          <span className="text-xs text-[#9db4a8]">Buried {project.createdAt}</span>
-          <button onClick={() => onDelete(project)} className="text-xs text-red-300 hover:text-red-200 underline cursor-pointer">
-            Remove this grave permanently
-          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -609,62 +843,64 @@ function AutopsyView({
 function GraveyardInsights({ projects, onSelectProject }) {
   const insights = useMemo(() => calculateGraveyardInsights(projects), [projects])
 
-  // Donut chart calculations
   const total = insights.total
   const radius = 40
-  const circumference = 2 * Math.PI * radius // ≈ 251.327
+  const circumference = 2 * Math.PI * radius
 
   const slices = useMemo(() => {
     if (total === 0) return []
     const statusOrder = [
-      { key: 'Dormant', color: '#71717a', label: 'Dormant' },
-      { key: 'Resurrected', color: '#34d399', label: 'Resurrected' },
-      { key: 'Revived', color: '#10b981', label: 'Revived ✓' },
-      { key: 'Adopted', color: '#f59e0b', label: 'Adopted' },
-      { key: 'Archived', color: '#4b5563', label: 'Archived' },
+      { key: 'Dormant', color: '#D6CEBC', label: 'Dormant' },
+      { key: 'Resurrected', color: '#C8963E', label: 'Resurrected' },
+      { key: 'Revived', color: '#16A06B', label: 'Revived ✓' },
+      { key: 'Adopted', color: '#E5C98A', label: 'Adopted' },
+      { key: 'Archived', color: '#8A9A8E', label: 'Archived' },
     ]
     let accumulated = 0
-    return statusOrder.map((s) => {
-      const count = insights.statusCounts[s.key] || 0
-      const ratio = count / total
-      const strokeDash = ratio * circumference
-      accumulated += ratio
-      return {
-        ...s,
-        count,
-        percent: Math.round(ratio * 100),
-        strokeDash: `${strokeDash} ${circumference}`,
-        strokeOffset: -((accumulated - ratio) * circumference),
-      }
-    }).filter((s) => s.count > 0)
+    return statusOrder
+      .map((s) => {
+        const count = insights.statusCounts[s.key] || 0
+        const ratio = count / total
+        const strokeDash = ratio * circumference
+        accumulated += ratio
+        return {
+          ...s,
+          count,
+          percent: Math.round(ratio * 100),
+          strokeDash: `${strokeDash} ${circumference}`,
+          strokeOffset: -((accumulated - ratio) * circumference),
+        }
+      })
+      .filter((s) => s.count > 0)
   }, [insights.statusCounts, total, circumference])
 
   return (
     <section className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-6">
         <div>
-          <p className="text-xs tracking-[0.3em] text-emerald-300 font-semibold">GRAVEYARD INSIGHTS</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-black mt-1">Living data from the afterlife.</h2>
-          <p className="text-sm text-[#9db4a8]">Real-time analytics computed live across your buried projects.</p>
+          <p className="text-xs tracking-[0.3em] text-[#8A6414] font-bold uppercase">GRAVEYARD INSIGHTS</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-black mt-1 text-[#1F2A24]">
+            Living data from the digital afterlife.
+          </h2>
+          <p className="text-sm text-[#4D5E53]">Real-time analytics computed live across your buried projects.</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full w-fit">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Live Graveyard Metrics</span>
+        <div className="flex items-center gap-2 text-xs text-[#0B7A55] bg-[#E2F3EA] border border-[#A7D7C5] px-3.5 py-1 rounded-full w-fit">
+          <span className="w-2 h-2 rounded-full bg-[#16A06B]" />
+          <span className="font-semibold">Live Graveyard Metrics</span>
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        {/* Panel 1: Pure SVG Donut Chart */}
-        <div className="bg-[#121a17] border border-[#26332d] rounded-2xl p-5 flex flex-col justify-between">
+      <div className="grid md:grid-cols-3 gap-5">
+        <div className="bg-white border border-[#E5DECD] rounded-[24px] p-6 card-shadow flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-sm tracking-wide text-[#cfe0d6]">STATUS BREAKDOWN</h3>
-            <p className="text-xs text-[#9db4a8] mt-0.5">Where your builds currently stand</p>
+            <h3 className="font-bold text-sm tracking-wide text-[#1F2A24]">STATUS BREAKDOWN</h3>
+            <p className="text-xs text-[#4D5E53] mt-0.5">Where your builds currently stand</p>
           </div>
 
-          <div className="flex items-center justify-center gap-6 my-4">
+          <div className="flex items-center justify-center gap-6 my-5">
             <div className="relative w-32 h-32 shrink-0">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r={radius} fill="none" stroke="#1d2b25" strokeWidth="14" />
+                <circle cx="50" cy="50" r={radius} fill="none" stroke="#F3EEE2" strokeWidth="13" />
                 {slices.map((slice) => (
                   <circle
                     key={slice.key}
@@ -673,7 +909,7 @@ function GraveyardInsights({ projects, onSelectProject }) {
                     r={radius}
                     fill="none"
                     stroke={slice.color}
-                    strokeWidth="14"
+                    strokeWidth="13"
                     strokeDasharray={slice.strokeDash}
                     strokeDashoffset={slice.strokeOffset}
                     strokeLinecap="round"
@@ -682,52 +918,54 @@ function GraveyardInsights({ projects, onSelectProject }) {
                 ))}
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-black text-white">{total}</span>
-                <span className="text-[10px] text-[#9db4a8]">Graves</span>
+                <span className="font-display text-2xl font-black text-[#1F2A24]">{total}</span>
+                <span className="text-[10px] text-[#4D5E53]">Graves</span>
               </div>
             </div>
 
             <div className="space-y-1.5 text-xs flex-1">
               {slices.length === 0 ? (
-                <p className="text-xs text-[#9db4a8]">No data yet</p>
+                <p className="text-xs text-[#4D5E53]">No data yet</p>
               ) : (
                 slices.map((s) => (
                   <div key={s.key} className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-[#cfe0d6]">
+                    <span className="flex items-center gap-1.5 text-[#1F2A24]">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
                       <span className="truncate">{s.label}</span>
                     </span>
-                    <span className="font-mono text-[#9db4a8] text-[11px]">{s.count} ({s.percent}%)</span>
+                    <span className="font-mono text-[#4D5E53] text-[11px]">{s.count} ({s.percent}%)</span>
                   </div>
                 ))
               )}
             </div>
           </div>
-          <p className="text-[11px] text-[#9db4a8] border-t border-[#26332d] pt-2">
+          <p className="text-[11px] text-[#4D5E53] border-t border-[#E5DECD] pt-2">
             Status updates automatically when fates are chosen or tasks completed.
           </p>
         </div>
 
-        {/* Panel 2: Score Distribution Bars */}
-        <div className="bg-[#121a17] border border-[#26332d] rounded-2xl p-5 flex flex-col justify-between">
+        <div className="bg-white border border-[#E5DECD] rounded-[24px] p-6 card-shadow flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-sm tracking-wide text-[#cfe0d6]">SCORE DISTRIBUTION</h3>
-            <p className="text-xs text-[#9db4a8] mt-0.5">Projects ranked by revival potential</p>
+            <h3 className="font-bold text-sm tracking-wide text-[#1F2A24]">SCORE DISTRIBUTION</h3>
+            <p className="text-xs text-[#4D5E53] mt-0.5">Projects ranked by revival potential</p>
           </div>
 
-          <div className="space-y-3.5 my-3">
+          <div className="space-y-4 my-4">
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-emerald-300 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" /> 80–100 Revival Ready
+                <span className="text-[#0B7A55] font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#16A06B]" /> 80–100 Revival Ready
                 </span>
-                <span className="font-mono text-[#cfe0d6] font-bold">
-                  {insights.scoreDistribution.high} <span className="text-[#9db4a8] text-[11px]">({total ? Math.round((insights.scoreDistribution.high / total) * 100) : 0}%)</span>
+                <span className="font-mono text-[#1F2A24] font-bold">
+                  {insights.scoreDistribution.high}{' '}
+                  <span className="text-[#4D5E53] text-[11px]">
+                    ({total ? Math.round((insights.scoreDistribution.high / total) * 100) : 0}%)
+                  </span>
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-[#0b0f0e] overflow-hidden">
+              <div className="h-2 rounded-full bg-[#F3EEE2] overflow-hidden">
                 <div
-                  className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                  className="h-full bg-[#16A06B] rounded-full transition-all duration-500"
                   style={{ width: `${total ? (insights.scoreDistribution.high / total) * 100 : 0}%` }}
                 />
               </div>
@@ -735,16 +973,19 @@ function GraveyardInsights({ projects, onSelectProject }) {
 
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-amber-300 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-400" /> 60–79 Promising Builds
+                <span className="text-[#8A6414] font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#C8963E]" /> 60–79 Promising Builds
                 </span>
-                <span className="font-mono text-[#cfe0d6] font-bold">
-                  {insights.scoreDistribution.mid} <span className="text-[#9db4a8] text-[11px]">({total ? Math.round((insights.scoreDistribution.mid / total) * 100) : 0}%)</span>
+                <span className="font-mono text-[#1F2A24] font-bold">
+                  {insights.scoreDistribution.mid}{' '}
+                  <span className="text-[#4D5E53] text-[11px]">
+                    ({total ? Math.round((insights.scoreDistribution.mid / total) * 100) : 0}%)
+                  </span>
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-[#0b0f0e] overflow-hidden">
+              <div className="h-2 rounded-full bg-[#F3EEE2] overflow-hidden">
                 <div
-                  className="h-full bg-amber-400 rounded-full transition-all duration-500"
+                  className="h-full bg-[#C8963E] rounded-full transition-all duration-500"
                   style={{ width: `${total ? (insights.scoreDistribution.mid / total) * 100 : 0}%` }}
                 />
               </div>
@@ -752,71 +993,133 @@ function GraveyardInsights({ projects, onSelectProject }) {
 
             <div>
               <div className="flex justify-between text-xs mb-1">
-                <span className="text-[#9db4a8] font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-zinc-500" /> 0–59 Deep Hibernation
+                <span className="text-[#4D5E53] font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-[#8A9A8E]" /> 0–59 Deep Hibernation
                 </span>
-                <span className="font-mono text-[#cfe0d6] font-bold">
-                  {insights.scoreDistribution.low} <span className="text-[#9db4a8] text-[11px]">({total ? Math.round((insights.scoreDistribution.low / total) * 100) : 0}%)</span>
+                <span className="font-mono text-[#1F2A24] font-bold">
+                  {insights.scoreDistribution.low}{' '}
+                  <span className="text-[#4D5E53] text-[11px]">
+                    ({total ? Math.round((insights.scoreDistribution.low / total) * 100) : 0}%)
+                  </span>
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-[#0b0f0e] overflow-hidden">
+              <div className="h-2 rounded-full bg-[#F3EEE2] overflow-hidden">
                 <div
-                  className="h-full bg-zinc-500 rounded-full transition-all duration-500"
+                  className="h-full bg-[#8A9A8E] rounded-full transition-all duration-500"
                   style={{ width: `${total ? (insights.scoreDistribution.low / total) * 100 : 0}%` }}
                 />
               </div>
             </div>
           </div>
 
-          <p className="text-[11px] text-[#9db4a8] border-t border-[#26332d] pt-2">
+          <p className="text-[11px] text-[#4D5E53] border-t border-[#E5DECD] pt-2">
             {insights.revivalReadyCount} dormant {insights.revivalReadyCount === 1 ? 'project is' : 'projects are'} currently ripe for continuation.
           </p>
         </div>
 
-        {/* Panel 3: Dormancy & Oldest Stats */}
-        <div className="bg-[#121a17] border border-[#26332d] rounded-2xl p-5 flex flex-col justify-between">
+        <div className="bg-white border border-[#E5DECD] rounded-[24px] p-6 card-shadow flex flex-col justify-between">
           <div>
-            <h3 className="font-bold text-sm tracking-wide text-[#cfe0d6]">DORMANCY & RECOVERY</h3>
-            <p className="text-xs text-[#9db4a8] mt-0.5">Time away turns into clarity</p>
+            <h3 className="font-bold text-sm tracking-wide text-[#1F2A24]">DORMANCY & RECOVERY</h3>
+            <p className="text-xs text-[#4D5E53] mt-0.5">Time away turns into clarity</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 my-3">
-            <div className="bg-[#0b0f0e] border border-[#26332d] rounded-xl p-3">
-              <span className="text-[11px] text-[#9db4a8] block">Avg. Dormancy</span>
-              <span className="text-2xl font-black text-emerald-300 font-mono mt-0.5 block">
+            <div className="bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-3.5">
+              <span className="text-[11px] text-[#4D5E53] font-medium block">Avg. Dormancy</span>
+              <span className="font-display text-2xl font-black text-[#0B7A55] mt-0.5 block">
                 {insights.averageDormancy}
-                <span className="text-xs font-normal text-[#9db4a8] ml-1">mo</span>
+                <span className="text-xs font-sans font-normal text-[#4D5E53] ml-1">mo</span>
               </span>
-              <span className="text-[10px] text-[#9db4a8] mt-1 block">Fresh eyes threshold</span>
+              <span className="text-[10px] text-[#4D5E53] mt-1 block">Fresh eyes threshold</span>
             </div>
 
-            <div className="bg-[#0b0f0e] border border-[#26332d] rounded-xl p-3">
-              <span className="text-[11px] text-[#9db4a8] block">Revival-Ready</span>
-              <span className="text-2xl font-black text-amber-300 font-mono mt-0.5 block">
+            <div className="bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-3.5">
+              <span className="text-[11px] text-[#4D5E53] font-medium block">Revival-Ready</span>
+              <span className="font-display text-2xl font-black text-[#8A6414] mt-0.5 block">
                 {total ? Math.round((insights.scoreDistribution.high / total) * 100) : 0}%
               </span>
-              <span className="text-[10px] text-[#9db4a8] mt-1 block">Score ≥ 80 ratio</span>
+              <span className="text-[10px] text-[#4D5E53] mt-1 block">Score ≥ 80 ratio</span>
             </div>
           </div>
 
           {insights.oldestGrave ? (
             <button
               onClick={() => onSelectProject(insights.oldestGrave.id)}
-              className="text-left bg-[#0b0f0e] border border-[#26332d] hover:border-emerald-500/40 rounded-xl p-2.5 transition-colors cursor-pointer w-full"
+              className="text-left bg-[#FAF6EE] border border-[#E5DECD] hover:border-[#16A06B] rounded-2xl p-3 transition-colors cursor-pointer w-full"
             >
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-amber-300 font-semibold">Oldest Grave</span>
-                <span className="text-[#9db4a8]">{insights.oldestGrave.monthsDormant} mo away</span>
+                <span className="text-[#8A6414] font-semibold">Oldest Grave</span>
+                <span className="text-[#4D5E53]">{insights.oldestGrave.monthsDormant} mo away</span>
               </div>
-              <div className="font-bold text-xs truncate mt-0.5">{insights.oldestGrave.title}</div>
+              <div className="font-bold text-xs truncate mt-0.5 text-[#1F2A24]">{insights.oldestGrave.title}</div>
             </button>
           ) : (
-            <div className="text-xs text-[#9db4a8] py-2">No graves buried yet.</div>
+            <div className="text-xs text-[#4D5E53] py-2">No graves buried yet.</div>
           )}
 
-          <p className="text-[11px] text-[#9db4a8] border-t border-[#26332d] pt-2 mt-2">
+          <p className="text-[11px] text-[#4D5E53] border-t border-[#E5DECD] pt-2 mt-2">
             Formula rewards up to 10 months of dormancy to encourage revival.
           </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function AdoptAGraveSection({ projects, onOpenAutopsy }) {
+  const adoptableProjects = projects.filter((p) => p.adoptable && p.status === 'Dormant')
+  if (adoptableProjects.length === 0) return null
+
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-8">
+      <div className="bg-gradient-to-r from-[#F7ECD2]/60 via-white to-[#F7ECD2]/30 border border-[#E5C98A] rounded-[24px] p-6 sm:p-7 card-shadow">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <span className="text-xs font-bold tracking-widest text-[#8A6414] uppercase">
+              COMMUNITY REVIVAL
+            </span>
+            <h3 className="font-display text-2xl font-bold text-[#1F2A24] mt-0.5">
+              Adopt-a-Grave
+            </h3>
+            <p className="text-xs text-[#4D5E53]">
+              These unfinished builds were generously marked for adoption by their original creators. Claim one to give it a second life.
+            </p>
+          </div>
+          <span className="text-xs bg-[#F7ECD2] text-[#8A6414] font-bold px-3 py-1 rounded-full shrink-0 w-fit">
+            {adoptableProjects.length} Available
+          </span>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+          {adoptableProjects.map((p) => (
+            <div
+              key={p.id}
+              className="bg-white border border-[#E5DECD] rounded-2xl p-4.5 flex flex-col justify-between card-shadow"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#F7ECD2] text-[#8A6414]">
+                    Adoptable
+                  </span>
+                  <span className="font-display font-bold text-sm text-[#8A6414]">
+                    Score: {resurrectionScore(p)}
+                  </span>
+                </div>
+                <h4 className="font-bold text-base text-[#1F2A24] mt-2">{p.title}</h4>
+                <p className="text-xs text-[#4D5E53] italic mt-1 line-clamp-2">“{p.epitaph}”</p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[#E5DECD]/60 flex items-center justify-between">
+                <span className="text-xs text-[#4D5E53]">{p.completeness}% built</span>
+                <button
+                  onClick={() => onOpenAutopsy(p)}
+                  className="bg-[#C8963E] hover:bg-[#B3822F] text-white text-xs font-bold px-4 py-1.5 rounded-full cursor-pointer shadow-xs transition-all"
+                >
+                  Adopt
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -827,14 +1130,14 @@ function TagFilterBar({ tags, selectedTag, onSelectTag, projectsCount }) {
   if (!tags || tags.length === 0) return null
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-      <span className="text-[#9db4a8] font-semibold text-[11px] mr-1 shrink-0">Tags:</span>
+    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+      <span className="text-[#4D5E53] font-semibold text-[11px] mr-1 shrink-0">Tags:</span>
       <button
         onClick={() => onSelectTag('All')}
-        className={`px-3 py-1 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
+        className={`px-3.5 py-1.5 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
           selectedTag === 'All'
-            ? 'bg-emerald-400 text-black font-bold shadow-xs'
-            : 'bg-[#121a17] border border-[#26332d] text-[#9db4a8] hover:text-white hover:border-[#384941]'
+            ? 'bg-[#1F2A24] text-[#FAF6EE] font-bold shadow-xs'
+            : 'bg-white border border-[#E5DECD] text-[#4D5E53] hover:text-[#1F2A24] hover:border-[#D6CEBC]'
         }`}
       >
         All ({projectsCount})
@@ -843,10 +1146,10 @@ function TagFilterBar({ tags, selectedTag, onSelectTag, projectsCount }) {
         <button
           key={t.name}
           onClick={() => onSelectTag(selectedTag === t.name ? 'All' : t.name)}
-          className={`px-3 py-1 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
+          className={`px-3.5 py-1.5 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
             selectedTag === t.name
-              ? 'bg-emerald-400 text-black font-bold shadow-xs'
-              : 'bg-[#121a17] border border-[#26332d] text-[#9db4a8] hover:text-white hover:border-[#384941]'
+              ? 'bg-[#1F2A24] text-[#FAF6EE] font-bold shadow-xs'
+              : 'bg-white border border-[#E5DECD] text-[#4D5E53] hover:text-[#1F2A24] hover:border-[#D6CEBC]'
           }`}
         >
           {t.name} <span className="opacity-70 text-[10px]">({t.count})</span>
@@ -862,50 +1165,90 @@ function ActivityFeed({ projects, onSelectProject }) {
 
   const visibleFeed = expanded ? feed : feed.slice(0, 6)
 
+  // Group by project
+  const groupedByProject = useMemo(() => {
+    const map = new Map()
+    visibleFeed.forEach((item) => {
+      if (!map.has(item.projectId)) {
+        map.set(item.projectId, { title: item.projectTitle, items: [] })
+      }
+      map.get(item.projectId).items.push(item)
+    })
+    return Array.from(map.entries())
+  }, [visibleFeed])
+
+  const getEventIcon = (type) => {
+    switch (type) {
+      case 'revive':
+        return <Sparkles className="w-3.5 h-3.5 text-[#16A06B]" />
+      case 'adopt':
+        return <HeartHandshake className="w-3.5 h-3.5 text-[#C8963E]" />
+      case 'fate':
+        return <Compass className="w-3.5 h-3.5 text-[#C8963E]" />
+      case 'autopsy':
+        return <FileText className="w-3.5 h-3.5 text-[#0B7A55]" />
+      default:
+        return <Archive className="w-3.5 h-3.5 text-[#8A6414]" />
+    }
+  }
+
   return (
     <section className="max-w-6xl mx-auto px-4 py-12">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-6">
         <div>
-          <p className="text-xs tracking-[0.3em] text-emerald-300 font-semibold">GRAVEYARD CHRONICLES</p>
-          <h2 className="font-display text-2xl sm:text-3xl font-black mt-1">Unified Activity Feed</h2>
-          <p className="text-sm text-[#9db4a8]">Every burial, autopsy, fate decision, and revival recorded in reverse-chronological order.</p>
+          <p className="text-xs tracking-[0.3em] text-[#8A6414] font-bold uppercase">GRAVEYARD CHRONICLES</p>
+          <h2 className="font-display text-2xl sm:text-3xl font-black mt-1 text-[#1F2A24]">
+            Unified Activity Feed
+          </h2>
+          <p className="text-sm text-[#4D5E53]">
+            Every burial, autopsy, fate decision, and revival recorded in reverse-chronological order.
+          </p>
         </div>
-        <span className="text-xs font-mono text-[#9db4a8]">{feed.length} total events</span>
+        <span className="text-xs font-mono text-[#4D5E53]">{feed.length} total events</span>
       </div>
 
       {feed.length === 0 ? (
-        <div className="text-center py-12 bg-[#121a17] border border-[#26332d] rounded-2xl">
-          <p className="text-sm text-[#9db4a8]">No activity recorded in the graveyard yet.</p>
+        <div className="text-center py-12 bg-white border border-[#E5DECD] rounded-2xl card-shadow">
+          <p className="text-sm text-[#4D5E53]">No activity recorded in the graveyard yet.</p>
         </div>
       ) : (
-        <div className="bg-[#121a17] border border-[#26332d] rounded-2xl p-5 sm:p-6">
-          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#26332d]">
-            {visibleFeed.map((item) => (
-              <div key={item.id} className="relative group">
-                {/* Timeline dot */}
-                <div className="absolute -left-6 top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#121a17] shadow-xs group-hover:scale-125 transition-transform" />
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <button
-                      onClick={() => onSelectProject(item.projectId)}
-                      className="font-bold text-sm text-[#e8f0ea] hover:text-emerald-300 transition-colors cursor-pointer text-left"
-                    >
-                      {item.projectTitle}
-                    </button>
-                    <span className="text-xs text-[#9db4a8]">•</span>
-                    <span className="text-xs text-[#cfe0d6]">{item.text}</span>
-                  </div>
-                  <span className="text-[11px] font-mono text-[#9db4a8] shrink-0">{item.date}</span>
+        <div className="bg-white border border-[#E5DECD] rounded-[24px] p-6 sm:p-7 card-shadow">
+          <div className="space-y-6">
+            {groupedByProject.map(([projectId, group]) => (
+              <div key={projectId} className="border-b border-[#E5DECD]/60 pb-5 last:border-b-0 last:pb-0">
+                <button
+                  onClick={() => onSelectProject(projectId)}
+                  className="font-display font-bold text-base text-[#1F2A24] hover:text-[#16A06B] transition-colors cursor-pointer text-left flex items-center gap-2 mb-3"
+                >
+                  <span>🪦</span>
+                  <span>{group.title}</span>
+                </button>
+
+                <div className="pl-6 space-y-3 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#E5DECD]">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="relative flex items-center justify-between gap-2">
+                      <div className="absolute -left-6 w-4 h-4 rounded-full bg-[#FAF6EE] border border-[#E5DECD] flex items-center justify-center">
+                        {getEventIcon(item.type)}
+                      </div>
+                      <span className="text-sm text-[#1F2A24]">{item.text}</span>
+                      <span
+                        className="text-xs font-mono text-[#4D5E53] shrink-0 cursor-help"
+                        title={item.date}
+                      >
+                        {timeAgo(item.date)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
 
           {feed.length > 6 && (
-            <div className="mt-6 pt-4 border-t border-[#26332d] text-center">
+            <div className="mt-6 pt-4 border-t border-[#E5DECD] text-center">
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="text-xs font-semibold text-emerald-300 hover:text-emerald-200 cursor-pointer py-1 px-4 rounded-full border border-[#26332d] hover:bg-[#182420] transition-colors"
+                className="text-xs font-semibold text-[#0B7A55] hover:underline cursor-pointer py-1.5 px-4 rounded-full border border-[#E5DECD] bg-[#FAF6EE] hover:bg-[#F3EEE2] transition-colors"
               >
                 {expanded ? 'Show less' : `Show all ${feed.length} activity records`}
               </button>
@@ -922,7 +1265,7 @@ const EMPTY_FORM = {
   tags: '', completeness: 50, ideaStrength: 70, monthsDormant: 3, adoptable: false, repoUrl: '',
 }
 
-function BuryForm({ onClose, onSave }) {
+function BuryForm({ onClose, onSave, onNotify }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [ghInput, setGhInput] = useState('')
   const [ghState, setGhState] = useState({ busy: false, msg: '' })
@@ -955,6 +1298,7 @@ function BuryForm({ onClose, onSave }) {
         busy: false,
         msg: `✓ Filled from ${repo.full_name} — ⭐ ${repo.stargazers_count} · last push ${monthsSince(repo.pushed_at)} months ago. Now complete the autopsy below.`,
       })
+      onNotify(`Fetched details from ${repo.full_name}`)
     } catch (err) {
       setGhState({ busy: false, msg: err.message || 'Could not reach GitHub. Fill the form manually instead.' })
     }
@@ -966,65 +1310,75 @@ function BuryForm({ onClose, onSave }) {
     monthsDormant: Number(form.monthsDormant),
   })
 
-  const valid = form.title.trim() && form.vision.trim() && form.reason.trim()
-  const field = 'w-full bg-[#0b0f0e] border border-[#26332d] rounded-xl px-3 py-2 text-sm mt-1 text-[#e8f0ea]'
-  const label = 'block text-sm font-semibold mt-4 text-[#cfe0d6]'
+  const missingFields = []
+  if (!form.title.trim()) missingFields.push('Title')
+  if (!form.vision.trim()) missingFields.push('Original vision')
+  if (!form.reason.trim()) missingFields.push('Honest reason work stopped')
+
+  const valid = missingFields.length === 0
+  const field = 'w-full bg-[#FAF6EE] border border-[#E5DECD] rounded-xl px-3.5 py-2 text-sm mt-1 text-[#1F2A24] focus:border-[#16A06B]'
+  const label = 'block text-sm font-semibold mt-4 text-[#1F2A24]'
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-6"
+      className="fixed inset-0 z-50 bg-[rgba(20,32,26,0.45)] backdrop-blur-[6px] flex items-end sm:items-center justify-center p-0 sm:p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: 40, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 40, opacity: 0 }}
+        initial={{ scale: 0.96, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#121a17] border border-[#26332d] w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl"
+        className="modal-scrollbar bg-white border border-[#E5DECD] w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 card-shadow text-[#1F2A24]"
         role="dialog"
         aria-modal="true"
         aria-label="Bury a project"
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Bury a project</h2>
-            <p className="text-sm text-[#9db4a8]">No shame. Give it a proper autopsy and it can live again.</p>
+            <h2 className="font-display text-2xl sm:text-3xl font-black text-[#1F2A24]">Bury a project</h2>
+            <p className="text-sm text-[#4D5E53] mt-0.5">No shame. Give it a proper autopsy and it can live again.</p>
           </div>
           <button
             onClick={onClose}
-            className="text-2xl leading-none px-2 text-[#9db4a8] hover:text-white cursor-pointer"
+            className="text-2xl leading-none px-2 text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
             aria-label="Close form"
           >
             ×
           </button>
         </div>
 
-        <div className="mt-5 bg-[#0b0f0e] border border-[#26332d] rounded-2xl p-4">
-          <p className="text-sm font-bold">⚡ Fastest way — bury it straight from GitHub</p>
-          <p className="text-xs text-[#9db4a8] mt-0.5">
-            Paste a public repo. We fetch its name, description, language and how long it has been dormant — you only write the autopsy.
+        {/* GitHub fetch box with Octocat icon */}
+        <div className="mt-5 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl p-4.5">
+          <div className="flex items-center gap-2">
+            <GitHubIcon className="w-5 h-5 text-[#1F2A24]" />
+            <p className="text-sm font-bold text-[#1F2A24]">Fastest way — bury it straight from GitHub</p>
+          </div>
+          <p className="text-xs text-[#4D5E53] mt-1">
+            Paste a public repo. We fetch its name, description, language and dormancy — you only write the autopsy.
           </p>
           <div className="flex flex-col sm:flex-row gap-2 mt-3">
             <input
               value={ghInput}
               onChange={(e) => setGhInput(e.target.value)}
               placeholder="github.com/you/that-dead-repo"
-              className="flex-1 bg-[#121a17] border border-[#26332d] rounded-xl px-3 py-2 text-sm text-[#e8f0ea]"
+              className="flex-1 bg-white border border-[#E5DECD] rounded-xl px-3.5 py-2 text-sm text-[#1F2A24]"
             />
             <button
               type="button"
               disabled={ghState.busy || !ghInput.trim()}
               onClick={fetchFromGitHub}
-              className="bg-emerald-400 text-black font-bold text-sm px-4 py-2 rounded-xl disabled:opacity-40 cursor-pointer"
+              className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold text-sm px-4 py-2 rounded-xl disabled:opacity-40 cursor-pointer shadow-xs"
             >
               {ghState.busy ? 'Fetching…' : 'Fetch repo'}
             </button>
           </div>
-          {ghState.msg && <p className="text-xs mt-2 text-[#cfe0d6]">{ghState.msg}</p>}
-          {form.repoUrl && <p className="text-xs mt-1 text-[#9db4a8]">Linked repo: {form.repoUrl}</p>}
+          {ghState.msg && <p className="text-xs mt-2 text-[#1F2A24] font-medium">{ghState.msg}</p>}
+          {form.repoUrl && <p className="text-xs mt-1 text-[#4D5E53]">Linked repo: {form.repoUrl}</p>}
         </div>
 
         <label className={label}>Project title *</label>
@@ -1093,7 +1447,6 @@ function BuryForm({ onClose, onSave }) {
               type="range"
               min="0"
               max="100"
-              className="w-full accent-emerald-400"
               value={form.completeness}
               onChange={(e) => set('completeness', Number(e.target.value))}
             />
@@ -1104,7 +1457,6 @@ function BuryForm({ onClose, onSave }) {
               type="range"
               min="0"
               max="100"
-              className="w-full accent-emerald-400"
               value={form.ideaStrength}
               onChange={(e) => set('ideaStrength', Number(e.target.value))}
             />
@@ -1125,79 +1477,109 @@ function BuryForm({ onClose, onSave }) {
         <label className="flex items-center gap-2 mt-4 text-sm cursor-pointer">
           <input
             type="checkbox"
-            className="accent-amber-400 w-4 h-4"
             checked={form.adoptable}
             onChange={(e) => set('adoptable', e.target.checked)}
           />
-          <span className="text-[#cfe0d6]">Mark as adoptable — another builder may claim and continue it</span>
+          <span className="text-[#1F2A24]">Mark as adoptable — another builder may claim and continue it</span>
         </label>
 
-        <div className="flex items-center justify-between mt-6 bg-[#0b0f0e] border border-[#26332d] rounded-2xl px-4 py-3">
-          <span className="text-sm text-[#9db4a8]">Live Resurrection Score preview</span>
-          <ScoreRing score={previewScore} size={52} />
+        <div className="flex items-center justify-between mt-6 bg-[#FAF6EE] border border-[#E5DECD] rounded-2xl px-4 py-3">
+          <span className="text-sm text-[#4D5E53]">Live Resurrection Score preview</span>
+          <ScoreRing score={previewScore} size={50} />
         </div>
 
-        <button
-          disabled={!valid}
-          onClick={() => onSave(form)}
-          className="w-full mt-4 bg-emerald-400 text-black font-bold py-3 rounded-2xl disabled:opacity-40 cursor-pointer transition-all"
-        >
-          Bury it with honour
-        </button>
-        {!valid && (
-          <p className="text-xs text-[#9db4a8] mt-2 text-center">
-            Title, vision and honest reason are required — the autopsy is the whole point.
-          </p>
-        )}
+        <div className="relative group mt-5">
+          <button
+            disabled={!valid}
+            onClick={() => onSave(form)}
+            className={`w-full py-3.5 rounded-full font-bold text-white transition-all ${
+              valid
+                ? 'bg-[#16A06B] hover:bg-[#128256] btn-bury-enabled cursor-pointer'
+                : 'bg-[#16A06B] opacity-50 cursor-not-allowed'
+            }`}
+            title={!valid ? `Missing required: ${missingFields.join(', ')}` : ''}
+          >
+            Bury it with honour
+          </button>
+          {!valid && (
+            <div className="text-xs text-[#BC3F26] mt-2 text-center font-medium">
+              Missing required: {missingFields.join(', ')} — the autopsy is the whole point.
+            </div>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   )
 }
 
-const STARS = Array.from({ length: 70 }, (_, i) => ({
-  left: `${(i * 37.7 + 11) % 100}%`,
-  top: `${(i * 23.3 + 5) % 55}%`,
-  size: (i % 3) + 1,
-  tw: `${2.2 + (i % 5) * 0.7}s`,
-  delay: `${(i % 7) * 0.4}s`,
-}))
+function ConfirmDialog({ isOpen, title, message, confirmText = 'Confirm', confirmStyle = 'danger', onConfirm, onCancel }) {
+  if (!isOpen) return null
 
-function Starfield() {
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-      {STARS.map((s, i) => (
-        <span
-          key={i}
-          className="star"
-          style={{
-            left: s.left,
-            top: s.top,
-            width: s.size,
-            height: s.size,
-            '--tw': s.tw,
-            animationDelay: s.delay,
-          }}
-        />
-      ))}
-      <div className="moon absolute rounded-full" style={{ width: 74, height: 74, right: '9%', top: 34 }} />
-      <div className="fog absolute rounded-full bg-emerald-200/10" style={{ width: '70%', height: 60, left: '15%', bottom: 6 }} />
-    </div>
+    <motion.div
+      className="fixed inset-0 z-50 bg-[rgba(20,32,26,0.45)] backdrop-blur-[6px] flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onCancel}
+    >
+      <motion.div
+        className="bg-white border border-[#E5DECD] rounded-[24px] p-6 sm:p-7 max-w-md w-full card-shadow text-[#1F2A24]"
+        initial={{ scale: 0.96, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-modal="true"
+      >
+        <h3 className="font-display text-xl font-bold">{title}</h3>
+        <p className="text-sm text-[#4D5E53] mt-2 leading-relaxed">{message}</p>
+        <div className="flex justify-end gap-2.5 mt-6">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-full border border-[#E5DECD] bg-white text-[#1F2A24] hover:bg-[#F3EEE2] text-xs font-semibold cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`px-5 py-2 rounded-full text-xs font-bold text-white shadow-xs cursor-pointer ${
+              confirmStyle === 'danger'
+                ? 'bg-[#BC3F26] hover:bg-[#A3341D]'
+                : 'bg-[#16A06B] hover:bg-[#128256]'
+            }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
 function AnimatedNumber({ value }) {
-  const [display, setDisplay] = useState(0)
+  const [display, setDisplay] = useState(value)
+  const prevRef = useRef(value)
+
   useEffect(() => {
+    const from = prevRef.current
+    const to = value
+    prevRef.current = value
+    if (from === to) return
+
     let raf
     const start = performance.now()
     const tick = (t) => {
       const k = Math.min((t - start) / 700, 1)
-      setDisplay(Math.round(value * (1 - Math.pow(1 - k, 3))))
+      const eased = 1 - Math.pow(1 - k, 3)
+      setDisplay(Math.round(from + (to - from) * eased))
       if (k < 1) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [value])
+
   return <>{display}</>
 }
 
@@ -1233,30 +1615,37 @@ function InfoSections({ onBury }) {
     <>
       <section className="max-w-6xl mx-auto px-4 py-14">
         <motion.div {...reveal}>
-          <p className="text-xs tracking-[0.3em] text-emerald-300 font-semibold text-center">HOW IT WORKS</p>
-          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2">From burial to resurrection in four steps.</h2>
+          <p className="text-xs tracking-[0.3em] text-[#8A6414] font-bold uppercase text-center">HOW IT WORKS</p>
+          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2 text-[#1F2A24]">
+            From burial to resurrection in four steps.
+          </h2>
         </motion.div>
-        <div className="relative grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-          <div className="hidden lg:block absolute top-7 left-[12%] right-[12%] h-px bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent" aria-hidden="true" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
           {STEPS.map((s, i) => (
             <motion.div
               key={s.n}
               {...reveal}
               transition={{ duration: 0.55, delay: i * 0.08 }}
-              className="relative bg-[#121a17] border border-[#26332d] rounded-2xl p-5"
+              className="bg-white border border-[#E5DECD] rounded-2xl p-6 card-shadow flex flex-col justify-between"
             >
-              <div className="w-9 h-9 rounded-full bg-emerald-400 text-black font-black flex items-center justify-center text-sm relative z-10">{s.n.slice(1)}</div>
-              <h3 className="font-bold mt-3">{s.title}</h3>
-              <p className="text-sm text-[#9db4a8] mt-1">{s.text}</p>
+              <div>
+                <div className="w-10 h-10 rounded-full bg-[#F7ECD2] text-[#8A6414] font-black font-display flex items-center justify-center text-sm">
+                  {s.n}
+                </div>
+                <h3 className="font-bold text-base mt-4 text-[#1F2A24]">{s.title}</h3>
+                <p className="text-sm text-[#4D5E53] mt-1.5 leading-relaxed">{s.text}</p>
+              </div>
             </motion.div>
           ))}
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 py-6">
+      <section className="max-w-6xl mx-auto px-4 py-8">
         <motion.div {...reveal}>
-          <p className="text-xs tracking-[0.3em] text-emerald-300 font-semibold text-center">TARGET USERS</p>
-          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2">Built for people who start things.</h2>
+          <p className="text-xs tracking-[0.3em] text-[#8A6414] font-bold uppercase text-center">TARGET USERS</p>
+          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2 text-[#1F2A24]">
+            Built for people who start things.
+          </h2>
         </motion.div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
           {PERSONAS.map((p, i) => (
@@ -1264,12 +1653,14 @@ function InfoSections({ onBury }) {
               key={p.title}
               {...reveal}
               transition={{ duration: 0.55, delay: i * 0.08 }}
-              className="bg-[#121a17] border border-[#26332d] rounded-2xl p-5"
+              className="bg-white border border-[#E5DECD] rounded-2xl p-6 card-shadow flex flex-col justify-between"
             >
-              <p className="text-[10px] tracking-[0.22em] text-amber-300 font-bold">{p.tag}</p>
-              <h3 className="font-bold mt-1.5">{p.title}</h3>
-              <p className="text-sm text-[#9db4a8] mt-1">{p.text}</p>
-              <p className="text-xs text-emerald-300 mt-3 font-semibold">{p.focus}</p>
+              <div>
+                <p className="text-[10px] tracking-[0.22em] text-[#8A6414] font-bold uppercase">{p.tag}</p>
+                <h3 className="font-bold text-base mt-2 text-[#1F2A24]">{p.title}</h3>
+                <p className="text-sm text-[#4D5E53] mt-1.5 leading-relaxed">{p.text}</p>
+              </div>
+              <p className="text-xs text-[#0B7A55] mt-4 font-semibold">{p.focus}</p>
             </motion.div>
           ))}
         </div>
@@ -1277,26 +1668,39 @@ function InfoSections({ onBury }) {
 
       <section className="max-w-6xl mx-auto px-4 py-14">
         <motion.div {...reveal}>
-          <p className="text-xs tracking-[0.3em] text-emerald-300 font-semibold text-center">THE PROBLEM → THE ANSWER</p>
-          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2">Four ways unfinished work loses its value.</h2>
+          <p className="text-xs tracking-[0.3em] text-[#8A6414] font-bold uppercase text-center">THE PROBLEM → THE ANSWER</p>
+          <h2 className="font-display text-3xl sm:text-4xl font-black text-center mt-2 text-[#1F2A24]">
+            Four ways unfinished work loses its value.
+          </h2>
         </motion.div>
-        <div className="mt-8 space-y-3">
+        <div className="mt-8 space-y-3.5">
           {PAINS.map((row, i) => (
             <motion.div
               key={row.pain}
               {...reveal}
               transition={{ duration: 0.5, delay: i * 0.06 }}
-              className="grid md:grid-cols-2 gap-2 md:gap-0 bg-[#121a17] border border-[#26332d] rounded-2xl overflow-hidden"
+              className="grid md:grid-cols-2 gap-2 md:gap-0 bg-white border border-[#E5DECD] rounded-2xl overflow-hidden card-shadow"
             >
-              <div className="p-5 text-[#cfe0d6]"><span className="text-red-300 font-bold mr-2">✕</span>{row.pain}</div>
-              <div className="p-5 bg-emerald-500/5 md:border-l border-[#26332d]"><span className="text-emerald-300 font-bold mr-2">✓</span>{row.fix}</div>
+              <div className="p-5 text-[#1F2A24]">
+                <span className="text-[#BC3F26] font-bold mr-2">✕</span>
+                {row.pain}
+              </div>
+              <div className="p-5 bg-[#E2F3EA]/35 md:border-l border-[#E5DECD] text-[#0B7A55]">
+                <span className="text-[#16A06B] font-bold mr-2">✓</span>
+                {row.fix}
+              </div>
             </motion.div>
           ))}
         </div>
-        <motion.div {...reveal} className="text-center mt-10">
-          <p className="font-display text-2xl font-bold italic">“An unfinished project isn't a worthless project.”</p>
-          <button onClick={onBury} className="shimmer-btn mt-5 bg-emerald-400 text-black font-bold px-6 py-3 rounded-full cursor-pointer">
-            <span className="relative z-[2]">Bury your first project</span>
+        <motion.div {...reveal} className="text-center mt-12">
+          <p className="font-display text-2xl font-bold italic text-[#4D5E53]">
+            “An unfinished project isn't a worthless project.”
+          </p>
+          <button
+            onClick={onBury}
+            className="mt-5 bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-7 py-3.5 rounded-full cursor-pointer shadow-sm transition-all"
+          >
+            Bury your first project
           </button>
         </motion.div>
       </section>
@@ -1304,27 +1708,104 @@ function InfoSections({ onBury }) {
   )
 }
 
-export default function App() {
-  const [projects, setProjects] = useState(loadProjects)
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center p-6 text-[#1F2A24]">
+          <div className="bg-white border border-[#E5DECD] rounded-[24px] p-8 max-w-lg w-full card-shadow text-center">
+            <span className="text-4xl mb-3 block">🪦</span>
+            <h1 className="font-display text-2xl font-bold">Something went wrong in the graveyard</h1>
+            <p className="text-sm text-[#4D5E53] mt-2">
+              Don't worry — your buried projects are safely recorded. You can reload or reset your local graveyard data.
+            </p>
+            <div className="flex justify-center gap-3 mt-6">
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-5 py-2.5 rounded-full text-xs shadow-xs cursor-pointer"
+              >
+                Reload graveyard
+              </button>
+              <button
+                onClick={() => {
+                  clearProjects()
+                  window.location.reload()
+                }}
+                className="bg-white border border-[#E5DECD] text-[#4D5E53] hover:text-[#1F2A24] font-semibold px-4 py-2.5 rounded-full text-xs cursor-pointer"
+              >
+                Reset saved data
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+export function AppContent() {
+  const [projects, setProjects] = useState(() => loadProjects() || SEED)
   const [selectedId, setSelectedId] = useState(null)
   const [showBury, setShowBury] = useState(false)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [selectedTag, setSelectedTag] = useState('All')
   const [sortBy, setSortBy] = useState('score')
+  const [toast, setToast] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
+
   const fileRef = useRef(null)
+  const searchRef = useRef(null)
+  const lastOpenerRef = useRef(null)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
+    saveProjects(window.localStorage, projects)
   }, [projects])
 
-  // Modal behaviour: Esc closes, background scroll locks while a dialog is open.
+  // Global "/" keyboard shortcut to focus search
   useEffect(() => {
-    if (!selectedId && !showBury) return
+    const onKey = (e) => {
+      if (
+        e.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Modal behaviour: Esc closes, scroll lock, focus restoration
+  useEffect(() => {
+    const isModalOpen = selectedId || showBury || confirmDialog.isOpen
+    if (!isModalOpen) {
+      if (lastOpenerRef.current && typeof lastOpenerRef.current.focus === 'function') {
+        lastOpenerRef.current.focus()
+        lastOpenerRef.current = null
+      }
+      return
+    }
+
+    if (!lastOpenerRef.current && document.activeElement) {
+      lastOpenerRef.current = document.activeElement
+    }
+
     const onKey = (e) => {
       if (e.key === 'Escape') {
         setSelectedId(null)
         setShowBury(false)
+        setConfirmDialog({ isOpen: false })
       }
     }
     document.addEventListener('keydown', onKey)
@@ -1334,7 +1815,18 @@ export default function App() {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
-  }, [selectedId, showBury])
+  }, [selectedId, showBury, confirmDialog.isOpen])
+
+  // Toast auto-dismiss after 3s
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  const notify = (message) => {
+    setToast({ id: Date.now(), message })
+  }
 
   const selected = projects.find((p) => p.id === selectedId) || null
 
@@ -1352,7 +1844,6 @@ export default function App() {
     return dormant.reduce((best, p) => (resurrectionScore(p) > resurrectionScore(best) ? p : best), dormant[0])
   }, [projects])
 
-  // Collect unique tags with counts
   const tagList = useMemo(() => {
     const map = {}
     projects.forEach((p) => {
@@ -1404,7 +1895,6 @@ export default function App() {
     }
 
     update(project.id, (p) => {
-      // Auto-generate revival plan if resuming and no plan exists
       const plan = (!isArchive && !p.revivalPlan) ? buildRevivalPlan(p) : p.revivalPlan
       return {
         ...p,
@@ -1413,6 +1903,7 @@ export default function App() {
         log: [...p.log, newLog],
       }
     })
+    notify(`Fate chosen: ${fate} — recorded in archive.`)
   }
 
   const handleGeneratePlan = (project) => {
@@ -1422,10 +1913,13 @@ export default function App() {
       revivalPlan: plan,
       log: [...p.log, { date: now(), text: 'Revival Plan generated from autopsy items.' }],
     }))
+    notify(`Revival Plan generated with ${plan.tasks.length} milestones.`)
   }
 
   const handleUpdatePlan = (project, newPlan) => {
     const progress = calculatePlanProgress(newPlan.tasks)
+    let reachedCompletion = false
+
     update(project.id, (p) => {
       let nextStatus = p.status
       const logs = [...p.log]
@@ -1433,6 +1927,7 @@ export default function App() {
       if (progress.allDone && p.status !== 'Revived') {
         nextStatus = 'Revived'
         logs.push({ date: now(), text: 'All revival tasks completed — project Revived ✓!' })
+        reachedCompletion = true
       } else if (!progress.allDone && p.status === 'Revived') {
         nextStatus = 'Resurrected'
         logs.push({ date: now(), text: 'Revival reopened — tasks remaining.' })
@@ -1445,6 +1940,16 @@ export default function App() {
         log: logs,
       }
     })
+
+    if (reachedCompletion) {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#16A06B', '#C8963E', '#F7ECD2'],
+      })
+      notify('🎉 All revival milestones finished! Project marked Revived ✓')
+    }
   }
 
   const handleAdopt = (project, name) => {
@@ -1454,21 +1959,54 @@ export default function App() {
       adoptedBy: name,
       log: [...p.log, { date: now(), text: `Adopted by ${name} — second life begins.` }],
     }))
+    notify(`Project adopted by ${name} — second life begins!`)
   }
 
   const handleToggleAdoptable = (project) => {
+    const willBeAdoptable = !project.adoptable
     update(project.id, (p) => ({
       ...p,
-      adoptable: !p.adoptable,
-      log: [...p.log, { date: now(), text: !p.adoptable ? 'Marked adoptable.' : 'Removed from adoption list.' }],
+      adoptable: willBeAdoptable,
+      log: [...p.log, { date: now(), text: willBeAdoptable ? 'Marked adoptable.' : 'Removed from adoption list.' }],
     }))
+    notify(willBeAdoptable ? 'Marked adoptable.' : 'Removed from adoption list.')
   }
 
-  const handleDelete = (project) => {
-    if (confirm(`Remove "${project.title}" permanently? This cannot be undone.`)) {
-      setProjects((ps) => ps.filter((p) => p.id !== project.id))
-      setSelectedId(null)
-    }
+  const promptDelete = (project) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: `Remove "${project.title}" permanently?`,
+      message: 'This cannot be undone. The autopsy, score and archive logs will be wiped.',
+      confirmText: 'Remove grave',
+      confirmStyle: 'danger',
+      onConfirm: () => {
+        setProjects((ps) => ps.filter((p) => p.id !== project.id))
+        setSelectedId(null)
+        setConfirmDialog({ isOpen: false })
+        notify('Project permanently removed from graveyard.')
+      },
+      onCancel: () => setConfirmDialog({ isOpen: false }),
+    })
+  }
+
+  const promptResetDemo = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Reset the graveyard demo?',
+      message: 'Your buried projects will be replaced with the 3 original demo projects.',
+      confirmText: 'Reset demo',
+      confirmStyle: 'primary',
+      onConfirm: () => {
+        setProjects(SEED)
+        clearProjects()
+        setSelectedId(null)
+        setSelectedTag('All')
+        setStatusFilter('All')
+        setConfirmDialog({ isOpen: false })
+        notify('Graveyard reset to demo projects.')
+      },
+      onCancel: () => setConfirmDialog({ isOpen: false }),
+    })
   }
 
   const handleSave = (form) => {
@@ -1495,6 +2033,7 @@ export default function App() {
     setProjects((ps) => [project, ...ps])
     setShowBury(false)
     setSelectedId(project.id)
+    notify('Project buried with honour.')
   }
 
   const exportJSON = () => {
@@ -1505,6 +2044,7 @@ export default function App() {
     a.download = 'project-graveyard-export.json'
     a.click()
     URL.revokeObjectURL(url)
+    notify('Graveyard data exported successfully.')
   }
 
   const importJSON = (e) => {
@@ -1537,158 +2077,217 @@ export default function App() {
           }))
           setProjects(clean)
           setSelectedId(null)
-        } else alert('That file is not a valid Project Graveyard export.')
-      } catch { alert('Could not read that file as JSON.') }
+          notify('Graveyard data imported successfully.')
+        } else {
+          notify('Invalid file format. Could not import.')
+        }
+      } catch {
+        notify('Could not read file as JSON.')
+      }
     }
     reader.readAsText(file)
     e.target.value = ''
   }
 
-  const resetDemo = () => {
-    if (confirm('Reset the graveyard back to the 3 demo projects? Your buried projects will be removed.')) {
-      setProjects(SEED)
-      setSelectedId(null)
-      setSelectedTag('All')
-      setStatusFilter('All')
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-[#0b0f0e]">
-      <nav className="sticky top-0 z-40 backdrop-blur-md bg-[#0b0f0e]/85 border-b border-[#26332d]/70">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <span className="font-display font-black text-lg flex items-center gap-2">
-            <span>🪦</span>
-            <span>The Project <span className="text-emerald-300">Graveyard</span></span>
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline text-[11px] px-2.5 py-1 rounded-full border border-amber-500/40 text-amber-300 font-semibold bg-amber-500/5">
-              BALOON · ROUND 2
+    <div className="min-h-screen text-[#1F2A24]">
+      {/* Sticky Header */}
+      <nav className="sticky top-0 z-40 backdrop-blur-md bg-[#FAF6EE]/90 border-b border-[#E5DECD]">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <span className="text-xl">🪦</span>
+            <span className="font-display font-black text-lg text-[#1F2A24] tracking-tight">
+              The Project Graveyard
             </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportJSON}
+              className="hidden sm:inline-block border border-[#E5DECD] bg-white px-3.5 py-1.5 rounded-full text-xs font-medium text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer"
+            >
+              Export
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="hidden sm:inline-block border border-[#E5DECD] bg-white px-3.5 py-1.5 rounded-full text-xs font-medium text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer"
+            >
+              Import
+            </button>
+            <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={importJSON} />
+
             <button
               onClick={() => setShowBury(true)}
-              className="shimmer-btn bg-emerald-400 text-black font-bold px-4 py-2 rounded-full text-sm cursor-pointer shadow-sm hover:bg-emerald-300 transition-colors"
+              className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-4 py-2 rounded-full text-xs sm:text-sm cursor-pointer shadow-xs flex items-center gap-1.5 transition-all"
             >
-              <span className="relative z-[2]">+ Bury a project</span>
+              <span>+</span>
+              <span>Bury a project</span>
             </button>
           </div>
         </div>
       </nav>
 
-      <header className="relative overflow-hidden">
-        <Starfield />
-        <div className="relative max-w-6xl mx-auto px-4 pt-16 pb-28 text-center">
-          <motion.p
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-xs tracking-[0.35em] text-emerald-300 font-semibold"
-          >
-            DIGITAL AFTERLIFE FOR UNFINISHED SOFTWARE
-          </motion.p>
-          <motion.h1
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 }}
-            className="font-display text-5xl sm:text-6xl lg:text-7xl font-black leading-[1.04] mt-4"
-          >
-            Every unfinished project<br /><span className="italic text-emerald-300">deserves a second chance.</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.16 }}
-            className="text-[#9db4a8] max-w-2xl mx-auto mt-4 text-base sm:text-lg"
-          >
-            Bury a project with an honest autopsy, calculate its Resurrection Score, choose its fate — restart, continue, repurpose, archive — and execute an actionable Revival Plan.
-          </motion.p>
+      {/* Hero Section */}
+      <header className="max-w-6xl mx-auto px-4 pt-12 pb-14">
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          <div className="lg:col-span-7 text-left">
+            <p className="text-xs tracking-[0.25em] text-[#8A6414] font-bold uppercase">
+              DIGITAL AFTERLIFE FOR UNFINISHED SOFTWARE
+            </p>
+            <h1
+              className="font-display text-4xl sm:text-5xl lg:text-6xl font-black text-[#1F2A24] leading-[1.08] mt-3"
+              style={{ textWrap: 'balance' }}
+            >
+              Where good projects rest —<br />
+              <span className="italic text-[#C8963E]">until they rise again.</span>
+            </h1>
+            <p className="text-[#4D5E53] text-base sm:text-lg mt-3.5 max-w-xl leading-relaxed">
+              Every unfinished project deserves a second chance.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 mt-7">
+              <button
+                onClick={() => setShowBury(true)}
+                className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-6 py-3 rounded-full text-sm sm:text-base cursor-pointer shadow-sm transition-all"
+              >
+                Bury a project
+              </button>
+              <button
+                onClick={() => setShowBury(true)}
+                className="bg-white hover:bg-[#F3EEE2] text-[#1F2A24] font-semibold border border-[#E5DECD] px-5 py-3 rounded-full text-sm sm:text-base cursor-pointer shadow-2xs flex items-center gap-2 transition-all"
+              >
+                <GitHubIcon className="w-4 h-4 text-[#1F2A24]" />
+                <span>Fetch from GitHub</span>
+              </button>
+            </div>
+          </div>
+
           <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.24 }}
-            className="flex flex-wrap justify-center gap-2 mt-7"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring', stiffness: 200, damping: 25 }}
+            className="lg:col-span-5"
           >
-            <button
-              onClick={() => setShowBury(true)}
-              className="shimmer-btn bg-emerald-400 text-black font-bold px-6 py-3 rounded-full cursor-pointer hover:bg-emerald-300 transition-colors"
-            >
-              <span className="relative z-[2]">+ Bury a project</span>
-            </button>
-            <button
-              onClick={exportJSON}
-              className="border border-[#26332d] bg-[#121a17]/70 px-4 py-3 rounded-full text-sm cursor-pointer hover:bg-[#182420] transition-colors"
-            >
-              Export JSON
-            </button>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="border border-[#26332d] bg-[#121a17]/70 px-4 py-3 rounded-full text-sm cursor-pointer hover:bg-[#182420] transition-colors"
-            >
-              Import JSON
-            </button>
-            <input ref={fileRef} type="file" accept="application/json" className="hidden" onChange={importJSON} />
-            <button
-              onClick={resetDemo}
-              className="border border-[#26332d] bg-[#121a17]/70 px-4 py-3 rounded-full text-sm text-[#9db4a8] hover:text-white cursor-pointer hover:bg-[#182420] transition-colors"
-            >
-              Reset demo
-            </button>
+            <div className="relative rounded-[24px] overflow-hidden card-shadow border border-[#E5DECD] bg-white">
+              <img
+                src="/hero-dawn.webp"
+                alt="Dawn stone arch covered in ivy overlooking valleys and sunrise"
+                className="w-full h-auto object-cover block"
+              />
+            </div>
           </motion.div>
         </div>
-        <svg className="absolute bottom-0 left-0 w-full pointer-events-none" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0,70 C240,40 420,85 720,60 C1020,35 1200,80 1440,55 L1440,90 L0,90 Z" fill="#0e1512" />
-          <g fill="#0e1512">
-            <rect x="180" y="34" width="26" height="34" rx="12" />
-            <rect x="640" y="26" width="30" height="38" rx="14" />
-            <rect x="1090" y="30" width="24" height="32" rx="11" />
-            <rect x="1265" y="40" width="18" height="24" rx="8" />
-          </g>
-          <path d="M0,82 C260,60 520,90 820,72 C1100,56 1280,84 1440,70 L1440,90 L0,90 Z" fill="#0b0f0e" />
-        </svg>
       </header>
 
-      {/* Top Quick Counters */}
-      <section className="max-w-6xl mx-auto px-4 grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {[
-          ['Buried', stats.total],
-          ['Dormant', stats.dormant],
-          ['Revived / Active', stats.resurrected],
-          ['Adopted', stats.adopted],
-          ['Avg. score', stats.avgScore],
-        ].map(([label, value]) => (
-          <div key={label} className="bg-[#121a17] border border-[#26332d] rounded-2xl p-4 text-center">
-            <div className="text-2xl font-black"><AnimatedNumber value={value} /></div>
-            <div className="text-xs text-[#9db4a8] mt-0.5">{label}</div>
+      {/* Stats Strip with Lucide Icons in Tinted Circles */}
+      <section className="max-w-6xl mx-auto px-4 -mt-2 mb-8">
+        <div className="bg-white border border-[#E5DECD] rounded-[24px] p-4 sm:p-6 card-shadow grid grid-cols-2 sm:grid-cols-5 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-[#E5DECD]">
+          <div className="flex flex-col items-center justify-center text-center p-2">
+            <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#8A6414] mb-1.5 shadow-2xs">
+              <Archive className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+            <div className="font-display text-3xl sm:text-4xl font-black text-[#1F2A24]">
+              <AnimatedNumber value={stats.total} />
+            </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#4D5E53] uppercase mt-1">BURIED</span>
           </div>
-        ))}
+
+          <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2">
+            <div className="w-10 h-10 rounded-full bg-[#F3EEE2] flex items-center justify-center text-[#4D5E53] mb-1.5 shadow-2xs">
+              <Moon className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+            <div className="font-display text-3xl sm:text-4xl font-black text-[#1F2A24]">
+              <AnimatedNumber value={stats.dormant} />
+            </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#4D5E53] uppercase mt-1">DORMANT</span>
+          </div>
+
+          <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2">
+            <div className="w-10 h-10 rounded-full bg-[#E2F3EA] flex items-center justify-center text-[#0B7A55] mb-1.5 shadow-2xs">
+              <Sprout className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+            <div className="font-display text-3xl sm:text-4xl font-black text-[#0B7A55]">
+              <AnimatedNumber value={stats.resurrected} />
+            </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#0B7A55] uppercase mt-1">REVIVED / ACTIVE</span>
+          </div>
+
+          <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2">
+            <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#8A6414] mb-1.5 shadow-2xs">
+              <HeartHandshake className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+            <div className="font-display text-3xl sm:text-4xl font-black text-[#1F2A24]">
+              <AnimatedNumber value={stats.adopted} />
+            </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#4D5E53] uppercase mt-1">ADOPTED</span>
+          </div>
+
+          <div className="flex flex-col items-center justify-center text-center p-2 pt-4 sm:pt-2 col-span-2 sm:col-span-1">
+            <div className="w-10 h-10 rounded-full bg-[#F7ECD2] flex items-center justify-center text-[#C8963E] mb-1.5 shadow-2xs">
+              <Star className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+            <div className="font-display text-3xl sm:text-4xl font-black text-[#8A6414]">
+              <AnimatedNumber value={stats.avgScore} />
+            </div>
+            <span className="text-[11px] font-bold tracking-wider text-[#8A6414] uppercase mt-1">AVERAGE SCORE</span>
+          </div>
+        </div>
       </section>
 
-      {/* Revival Radar */}
+      {/* Revival Radar with 140px Graphic & 6s Sweep */}
       {radar && (
-        <section className="max-w-6xl mx-auto px-4 mt-4">
-          <button
-            onClick={() => setSelectedId(radar.id)}
-            className="w-full text-left bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-amber-500/10 border border-emerald-500/35 hover:border-emerald-400/60 rounded-2xl p-4 cursor-pointer transition-colors"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <span className="text-xs font-bold tracking-widest text-emerald-300 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  ⚡ REVIVAL RADAR — HIGHEST SCORE STILL SLEEPING
-                </span>
-                <span className="block font-bold mt-1 text-lg sm:text-xl text-[#e8f0ea]">
-                  {radar.title} — Resurrection Score {resurrectionScore(radar)}/100
-                </span>
-                <span className="block text-sm text-[#9db4a8]">
-                  If you revive one project this weekend, the data says this one. Tap to inspect the autopsy & revival plan.
-                </span>
+        <section className="max-w-6xl mx-auto px-4 mb-8">
+          <div className="bg-white border border-[#E5DECD] rounded-[24px] p-6 sm:p-8 card-shadow">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                {/* 140px Radar Graphic */}
+                <div className="relative w-[140px] h-[140px] rounded-full bg-[#FAF6EE] border border-[#E5DECD] flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                  <div className="absolute inset-2 rounded-full border border-[#A7D7C5]/50" />
+                  <div className="absolute inset-5 rounded-full border border-[#A7D7C5]/40" />
+                  <div className="absolute inset-8 rounded-full border border-[#A7D7C5]/30" />
+                  <div className="absolute inset-11 rounded-full border border-[#A7D7C5]/20" />
+                  <div
+                    className="absolute inset-0 radar-sweep-slow pointer-events-none"
+                    style={{
+                      background: 'conic-gradient(from 0deg, transparent 0deg, rgba(22, 160, 107, 0.15) 300deg, rgba(22, 160, 107, 0.45) 360deg)',
+                    }}
+                  />
+                  <span className="w-3.5 h-3.5 rounded-full bg-[#C8963E] pulse-gold relative z-10" />
+                </div>
+
+                <div>
+                  <h3 className="font-display text-xl sm:text-2xl font-bold text-[#1F2A24]">
+                    Revival Radar
+                  </h3>
+                  <p className="text-sm font-semibold text-[#1F2A24] mt-0.5">
+                    {radar.title} — highest chance of revival
+                  </p>
+                  <div className="font-display text-3xl sm:text-5xl font-black text-[#C8963E] leading-tight mt-1.5">
+                    {resurrectionScore(radar)}{' '}
+                    <span className="text-base font-sans font-normal text-[#4D5E53]">/ 100</span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[#4D5E53] mt-1.5 max-w-xl leading-relaxed">
+                    Signal is strong: active commits predicted, documentation 80% complete, community interest rising.
+                  </p>
+                </div>
               </div>
-              <span className="text-xs bg-emerald-400 text-black font-bold px-3 py-1.5 rounded-full shrink-0 w-fit">
-                Open Autopsy →
-              </span>
+
+              <button
+                onClick={() => setSelectedId(radar.id)}
+                className="bg-[#16A06B] hover:bg-[#128256] text-white text-sm font-bold px-7 py-3 rounded-full shrink-0 shadow-xs cursor-pointer self-start md:self-center transition-all"
+              >
+                Open autopsy
+              </button>
             </div>
-          </button>
+          </div>
         </section>
       )}
+
+      {/* Adopt-a-Grave Section */}
+      <AdoptAGraveSection
+        projects={projects}
+        onOpenAutopsy={(p) => setSelectedId(p.id)}
+      />
 
       {/* Tag Chips Row */}
       <section className="max-w-6xl mx-auto px-4 mt-6">
@@ -1700,27 +2299,37 @@ export default function App() {
         />
       </section>
 
-      {/* Search & Sort Controls */}
-      <section className="max-w-6xl mx-auto px-4 mt-3 flex flex-col sm:flex-row gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title, tag or vision…"
-          className="flex-1 bg-[#121a17] border border-[#26332d] rounded-full px-4 py-2.5 text-sm text-[#e8f0ea]"
-        />
+      {/* Search, Sort & Filter Row */}
+      <section className="max-w-6xl mx-auto px-4 mt-3 flex flex-col sm:flex-row gap-2.5">
+        <div className="relative flex-1">
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search projects..."
+            className="w-full bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] placeholder-[#4D5E53] pr-12 card-shadow"
+          />
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
+            <kbd className="text-[10px] bg-[#F3EEE2] border border-[#E5DECD] px-1.5 py-0.5 rounded text-[#4D5E53] font-mono">
+              /
+            </kbd>
+          </div>
+        </div>
+
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[#121a17] border border-[#26332d] rounded-full px-4 py-2.5 text-sm text-[#cfe0d6] cursor-pointer"
+          className="bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
         >
           {['All', 'Dormant', 'Resurrected', 'Revived', 'Adopted', 'Archived', 'Adoptable'].map((s) => (
             <option key={s} value={s}>{s === 'Revived' ? 'Revived ✓' : s}</option>
           ))}
         </select>
+
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          className="bg-[#121a17] border border-[#26332d] rounded-full px-4 py-2.5 text-sm text-[#cfe0d6] cursor-pointer"
+          className="bg-white border border-[#E5DECD] rounded-full px-4 py-2.5 text-sm text-[#1F2A24] cursor-pointer card-shadow"
         >
           <option value="score">Sort: Highest score</option>
           <option value="recent">Sort: Recently buried</option>
@@ -1728,18 +2337,20 @@ export default function App() {
         </select>
       </section>
 
-      {/* Main Tombstone Grid */}
+      {/* Main Tombstone Cards Grid */}
       <main className="max-w-6xl mx-auto px-4 py-6 pb-12">
         {visible.length === 0 ? (
-          <div className="text-center py-20 bg-[#121a17] border border-dashed border-[#26332d] rounded-3xl">
-            <div className="text-5xl">🪦</div>
-            <h2 className="text-xl font-bold mt-3">Quiet for now</h2>
-            <p className="text-[#9db4a8] text-sm mt-1">
+          <div className="text-center py-20 bg-white border border-dashed border-[#E5DECD] rounded-[24px] card-shadow p-8 max-w-lg mx-auto">
+            <div className="w-16 h-16 rounded-full bg-[#F7ECD2] flex items-center justify-center mx-auto text-3xl mb-4">
+              🪦
+            </div>
+            <h2 className="font-display text-2xl font-bold text-[#1F2A24]">Quiet for now</h2>
+            <p className="text-[#4D5E53] text-sm mt-2 leading-relaxed">
               {projects.length === 0
-                ? 'No graves yet — bury your first unfinished build.'
-                : 'No projects match that search, tag, or status filter.'}
+                ? 'No graves yet in the cemetery. Bury your first unfinished build and give it a chance to rise again.'
+                : 'No projects match your search, tag, or status filter. Reset your filters to explore all graves.'}
             </p>
-            <div className="flex justify-center gap-2 mt-4">
+            <div className="flex justify-center gap-2 mt-5">
               {(query || statusFilter !== 'All' || selectedTag !== 'All') && (
                 <button
                   onClick={() => {
@@ -1747,21 +2358,21 @@ export default function App() {
                     setStatusFilter('All')
                     setSelectedTag('All')
                   }}
-                  className="border border-[#26332d] px-4 py-2 rounded-full text-xs text-[#9db4a8] hover:text-white cursor-pointer"
+                  className="border border-[#E5DECD] bg-white px-4 py-2 rounded-full text-xs font-semibold text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
                 >
                   Reset filters
                 </button>
               )}
               <button
                 onClick={() => setShowBury(true)}
-                className="bg-emerald-400 text-black font-bold px-5 py-2 rounded-full text-xs cursor-pointer hover:bg-emerald-300 transition-colors"
+                className="bg-[#16A06B] hover:bg-[#128256] text-white font-bold px-5 py-2.5 rounded-full text-xs cursor-pointer shadow-xs transition-all"
               >
                 + Bury a project
               </button>
             </div>
           </div>
         ) : (
-          <motion.div layout className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-fr">
             <AnimatePresence>
               {visible.map((p) => (
                 <TombstoneCard key={p.id} project={p} onOpen={(proj) => setSelectedId(proj.id)} />
@@ -1771,29 +2382,38 @@ export default function App() {
         )}
       </main>
 
-      {/* P2: Graveyard Insights Section */}
+      {/* Graveyard Insights Section */}
       <GraveyardInsights projects={projects} onSelectProject={(id) => setSelectedId(id)} />
 
       {/* Info Sections */}
       <InfoSections onBury={() => setShowBury(true)} />
 
-      {/* P3: Unified Activity Feed */}
+      {/* Activity Feed */}
       <ActivityFeed projects={projects} onSelectProject={(id) => setSelectedId(id)} />
 
       {/* Footer */}
-      <footer className="border-t border-[#26332d] mt-6 bg-[#080d0b]">
-        <div className="max-w-6xl mx-auto px-4 py-8 text-center">
-          <p className="font-display font-black text-base flex items-center justify-center gap-2">
+      <footer className="border-t border-[#E5DECD] mt-8 bg-white">
+        <div className="max-w-6xl mx-auto px-4 py-10 text-center">
+          <div className="flex items-center justify-center gap-2 font-display font-black text-lg text-[#1F2A24]">
             <span>🪦</span>
             <span>The Project Graveyard</span>
-          </p>
-          <p className="text-xs text-[#9db4a8] mt-1.5 leading-relaxed">
-            Frontend-only by design — no account, no backend, your graveyard lives in your browser (localStorage).<br />
+          </div>
+          <p className="text-xs text-[#4D5E53] mt-2 leading-relaxed">
+            Frontend-only by design — no account, no backend, your graveyard lives in your browser.<br />
             Built by Manthan Rajpurohit · Team Straw hat pirate · Baloon National Hackathon 2026, Round 2.
           </p>
-          <p className="text-xs text-emerald-300/80 italic mt-2">
+          <p className="font-display italic text-sm text-[#4D5E53] mt-3">
             Honouring past code so good ideas never stay buried.
           </p>
+
+          <div className="flex justify-center gap-3 mt-4">
+            <button
+              onClick={promptResetDemo}
+              className="text-xs text-[#4D5E53] hover:text-[#1F2A24] underline cursor-pointer"
+            >
+              Reset demo graveyard
+            </button>
+          </div>
         </div>
       </footer>
 
@@ -1806,13 +2426,62 @@ export default function App() {
             onFate={handleFate}
             onAdopt={handleAdopt}
             onToggleAdoptable={handleToggleAdoptable}
-            onDelete={handleDelete}
+            onDeleteRequest={promptDelete}
             onUpdatePlan={handleUpdatePlan}
             onGeneratePlan={handleGeneratePlan}
+            onNotify={notify}
           />
         )}
-        {showBury && <BuryForm onClose={() => setShowBury(false)} onSave={handleSave} />}
+        {showBury && (
+          <BuryForm
+            onClose={() => setShowBury(false)}
+            onSave={handleSave}
+            onNotify={notify}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Styled In-App Confirmation Modal */}
+      <AnimatePresence>
+        {confirmDialog.isOpen && (
+          <ConfirmDialog
+            isOpen={confirmDialog.isOpen}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            confirmText={confirmDialog.confirmText}
+            confirmStyle={confirmDialog.confirmStyle}
+            onConfirm={confirmDialog.onConfirm}
+            onCancel={confirmDialog.onCancel}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Fixed Bottom-Center Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#FAF6EE] border border-[#E5DECD] text-[#1F2A24] px-5 py-3 rounded-full card-shadow flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-lg"
+          >
+            <div className="w-5 h-5 rounded-full bg-[#16A06B] flex items-center justify-center text-white text-[11px] font-bold">
+              <Check className="w-3.5 h-3.5" />
+            </div>
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   )
 }

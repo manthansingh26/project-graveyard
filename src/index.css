@@ -2,72 +2,235 @@
 @import "tailwindcss";
 
 @theme {
-  --color-night: #0b0f0e;
-  --color-moss: #121a17;
-  --color-stone-card: #182420;
-  --color-mist: #9db4a8;
-  --color-bone: #e8f0ea;
-  --color-mint: #34d399;
-  --color-gold: #f2c14e;
+  --color-cream: #FAF6EE;
+  --color-surface: #FFFFFF;
+  --color-inset: #F3EEE2;
+  --color-border-warm: #E5DECD;
+  --color-ink: #1F2A24;
+  --color-sage: #4D5E53;
+  --color-gold: #C8963E;
+  --color-gold-text: #8A6414;
+  --color-gold-tint: #F7ECD2;
+  --color-emerald: #16A06B;
+  --color-emerald-hover: #128256;
+  --color-emerald-tint: #E2F3EA;
+  --color-emerald-text: #0B7A55;
+  --color-danger: #BC3F26;
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background: radial-gradient(ellipse at 50% 0%, #111a16 0%, #0b0f0e 55%, #060908 100%);
-  color: #e8f0ea;
+  background-color: #FAF6EE;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.6) 0%, transparent 70%),
+    radial-gradient(#E5DECD 0.8px, transparent 0.8px);
+  background-size: 100% 100%, 20px 20px;
+  color: #1F2A24;
   font-family: var(--font-sans);
   overflow-x: hidden;
   min-height: 100vh;
+  font-size: 14px;
 }
-::selection { background: #34d399; color: #0b0f0e; }
 
-/* Custom sleek dark scrollbar */
-::-webkit-scrollbar { width: 7px; height: 7px; }
-::-webkit-scrollbar-track { background: #0b0f0e; }
-::-webkit-scrollbar-thumb { background: #26332d; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #34d399; }
+::selection {
+  background: #E2F3EA;
+  color: #0B7A55;
+}
 
-.font-display { font-family: var(--font-display); }
+/* Custom sleek scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF6EE;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6CEBC;
+  border-radius: 999px;
+  border: 2px solid #FAF6EE;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #16A06B;
+}
 
-/* Tombstone card: arched top, stone gradient, engraved feel */
-.tombstone {
+/* Modal Inset Thin Scrollbar */
+.modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #D6CEBC transparent;
+}
+.modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 12px 0;
+}
+.modal-scrollbar::-webkit-scrollbar-thumb {
+  background: #D6CEBC;
+  border-radius: 999px;
+}
+.modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #16A06B;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Shadows */
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(96, 78, 38, 0.05), 0 8px 24px -12px rgba(96, 78, 38, 0.16);
+}
+
+/* Tombstone Card with Arched Top */
+.tombstone-card {
+  box-shadow: 0 1px 2px rgba(96, 78, 38, 0.05), 0 8px 24px -12px rgba(96, 78, 38, 0.14);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tombstone-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -12px rgba(200, 150, 62, 0.22), 0 0 0 1px rgba(200, 150, 62, 0.3);
+}
+
+.tombstone-arch-head {
   border-radius: 999px 999px 20px 20px;
-  background: linear-gradient(180deg, #1d2b25 0%, #182420 55%, #141d19 100%);
-  box-shadow: inset 0 1px 0 rgba(232,240,234,.07), inset 0 -12px 24px rgba(0,0,0,.35);
+  background: linear-gradient(180deg, #FFFFFF 0%, #FAF6EE 100%);
+  transition: background 200ms ease;
 }
-.grave-glow:hover {
-  box-shadow: inset 0 1px 0 rgba(232,240,234,.12), 0 0 0 1px rgba(52,211,153,.45), 0 22px 55px -18px rgba(52,211,153,.35);
-}
-
-/* Shimmer CTA — 21st.dev style */
-.shimmer-btn { position: relative; overflow: hidden; isolation: isolate; }
-.shimmer-btn::after {
-  content: ""; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
-  transform: translateX(-120%); animation: shimmer 2.8s ease-in-out infinite;
-}
-@keyframes shimmer { 0%, 55% { transform: translateX(-120%);} 85%, 100% { transform: translateX(120%);} }
-
-/* Twinkling starfield */
-@keyframes twinkle { 0%, 100% { opacity: .15; } 50% { opacity: .9; } }
-.star { position: absolute; border-radius: 999px; background: #e8f0ea; animation: twinkle var(--tw, 3s) ease-in-out infinite; }
-
-/* Moon */
-.moon {
-  background: radial-gradient(circle at 38% 35%, #fdf6d8 0%, #f2e3ac 45%, #d9c078 100%);
-  box-shadow: 0 0 60px 18px rgba(242,225,172,.28), 0 0 140px 60px rgba(242,225,172,.12);
+.tombstone-card:hover .tombstone-arch-head {
+  background: linear-gradient(180deg, #FFFDF8 0%, #F5EEDC 100%);
 }
 
-/* Ground fog drifting over the graveyard hill */
-@keyframes fogdrift { 0% { transform: translateX(-4%);} 100% { transform: translateX(4%);} }
-.fog { animation: fogdrift 9s ease-in-out infinite alternate; filter: blur(18px); }
+/* Styled Range Input (green filled track, gold thumb, 6px track) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #E5DECD;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #C8963E;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(31, 42, 36, 0.25);
+  cursor: pointer;
+  transition: transform 120ms ease-out, background-color 120ms ease-out;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.18);
+  background: #B3822F;
+}
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #E5DECD;
+  border-radius: 999px;
+}
+input[type="range"]::-moz-range-progress {
+  height: 6px;
+  background: #16A06B;
+  border-radius: 999px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #C8963E;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(31, 42, 36, 0.25);
+  cursor: pointer;
+}
 
-input, textarea, select { outline: none; }
-input:focus, textarea:focus, select:focus { border-color: #34d399 !important; }
-button:focus-visible, a:focus-visible { outline: 2px solid #34d399; outline-offset: 2px; }
+/* Styled Checkbox */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #E5DECD;
+  border-radius: 5px;
+  background: #FFFFFF;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: all 120ms ease-out;
+}
+input[type="checkbox"]:checked {
+  background: #16A06B;
+  border-color: #16A06B;
+}
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid #16A06B;
+  outline-offset: 2px;
+}
+
+/* Tactile button presses */
+button, input[type="button"], input[type="submit"] {
+  transition: transform 100ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Focus rings in emerald */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid #16A06B;
+  outline-offset: 2px;
+}
+
+/* Radar rotation: slow 6s rotating conic-gradient sweep */
+@keyframes radar-sweep-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.radar-sweep-slow {
+  animation: radar-sweep-slow 6s linear infinite;
+  transform-origin: center;
+}
+
+/* Pulsing gold dot */
+@keyframes pulse-gold {
+  0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(200, 150, 62, 0.7); }
+  50% { transform: scale(1.25); opacity: 0.9; box-shadow: 0 0 0 8px rgba(200, 150, 62, 0); }
+}
+.pulse-gold {
+  animation: pulse-gold 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Bury button enabled shadow */
+.btn-bury-enabled {
+  box-shadow: 0 4px 14px 0 rgba(22, 160, 107, 0.35);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer-btn::after, .fog, .star { animation: none !important; }
+  .radar-sweep-slow, .pulse-gold {
+    animation: none !important;
+  }
+  .tombstone-card:hover {
+    transform: none !important;
+  }
+  button:active {
+    transform: none !important;
+  }
 }

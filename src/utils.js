@@ -16,6 +16,34 @@ export function monthsSince(dateStr, nowMs = Date.now()) {
   return Math.max(0, Math.round((nowMs - then) / (1000 * 60 * 60 * 24 * 30.44)))
 }
 
+export function timeAgo(dateStr, nowMs = Date.now()) {
+  const then = new Date(dateStr).getTime()
+  if (Number.isNaN(then)) return dateStr || ''
+  const diffSec = Math.floor((nowMs - then) / 1000)
+  if (diffSec < 60) return 'just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHour = Math.floor(diffMin / 60)
+  if (diffHour < 24) return `${diffHour}h ago`
+  const diffDays = Math.floor(diffHour / 24)
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 30) return `${diffDays}d ago`
+  const diffMonths = Math.floor(diffDays / 30.44)
+  if (diffMonths < 12) return `${diffMonths}mo ago`
+  const diffYears = Math.floor(diffDays / 365.25)
+  return `${diffYears}y ago`
+}
+
+export function getActivityEventType(text = '') {
+  const s = text.toLowerCase()
+  if (s.includes('buried')) return 'bury'
+  if (s.includes('revived') || s.includes('all revival')) return 'revive'
+  if (s.includes('adopt')) return 'adopt'
+  if (s.includes('fate') || s.includes('resurrected') || s.includes('archive')) return 'fate'
+  if (s.includes('autopsy') || s.includes('milestone') || s.includes('plan')) return 'autopsy'
+  return 'bury'
+}
+
 export function calculatePlanProgress(tasks) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return { total: 0, completed: 0, percent: 0, allDone: false }
@@ -109,6 +137,7 @@ export function mergeActivityFeed(projects) {
           projectTitle: p.title,
           date: l.date || '',
           text: l.text || '',
+          type: getActivityEventType(l.text),
         })
       })
     }

@@ -42,6 +42,11 @@ body {
   color: #0B7A55;
 }
 
+:focus-visible {
+  outline: 2px solid #16A06B;
+  outline-offset: 2px;
+}
+
 /* Custom sleek scrollbars */
 ::-webkit-scrollbar {
   width: 8px;

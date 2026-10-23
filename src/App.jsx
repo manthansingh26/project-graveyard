@@ -384,12 +384,15 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
                 : 'bg-white border-[#E5DECD] text-[#1F2A24] shadow-2xs'
             }`}
           >
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <input
-                type="checkbox"
-                checked={task.done}
-                onChange={() => handleToggleTask(task.id)}
-              />
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              <label className="min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer -ml-2 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={task.done}
+                  onChange={() => handleToggleTask(task.id)}
+                  aria-label={`Mark "${task.text}" as ${task.done ? 'incomplete' : 'complete'}`}
+                />
+              </label>
               {editingId === task.id ? (
                 <div className="flex items-center gap-2 flex-1">
                   <input
@@ -429,18 +432,20 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
             </div>
 
             {editingId !== task.id && (
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => handleStartEdit(task)}
-                  className="text-xs text-[#4D5E53] hover:text-[#16A06B] px-1.5 py-0.5 rounded cursor-pointer"
+                  className="w-9 h-9 flex items-center justify-center text-xs text-[#4D5E53] hover:text-[#16A06B] hover:bg-[#F3EEE2] rounded-full cursor-pointer transition-colors"
                   title="Edit task"
+                  aria-label="Edit milestone"
                 >
                   ✎
                 </button>
                 <button
                   onClick={() => handleDeleteTask(task.id)}
-                  className="text-xs text-[#4D5E53] hover:text-[#BC3F26] px-1.5 py-0.5 rounded cursor-pointer"
+                  className="w-9 h-9 flex items-center justify-center text-xs text-[#4D5E53] hover:text-[#BC3F26] hover:bg-[#FDF2F0] rounded-full cursor-pointer transition-colors"
                   title="Remove task"
+                  aria-label="Remove milestone"
                 >
                   ✕
                 </button>
@@ -469,6 +474,70 @@ function RevivalPlanSection({ project, onUpdatePlan, onGeneratePlan }) {
   )
 }
 
+function useModalTrap({ isOpen, onClose }) {
+  const modalRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const el = modalRef.current
+    if (!el) return
+
+    const previousActiveElement = document.activeElement
+
+    const getFocusables = () =>
+      Array.from(
+        el.querySelectorAll(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((node) => node.offsetParent !== null)
+
+    const focusables = getFocusables()
+    if (focusables.length > 0) {
+      const firstInput = focusables.find((n) => n.tagName === 'INPUT') || focusables[0]
+      firstInput.focus()
+    }
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+        return
+      }
+      if (e.key === 'Tab') {
+        const nodes = getFocusables()
+        if (nodes.length === 0) {
+          e.preventDefault()
+          return
+        }
+        const first = nodes[0]
+        const last = nodes[nodes.length - 1]
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+        previousActiveElement.focus()
+      }
+    }
+  }, [isOpen, onClose])
+
+  return modalRef
+}
+
 function AutopsyView({
   project,
   onClose,
@@ -480,6 +549,7 @@ function AutopsyView({
   onGeneratePlan,
   onNotify,
 }) {
+  const modalRef = useModalTrap({ isOpen: true, onClose })
   const score = resurrectionScore(project)
   const breakdown = scoreBreakdown(project)
   const [adopter, setAdopter] = useState('')
@@ -540,12 +610,13 @@ function AutopsyView({
       onClick={onClose}
     >
       <motion.div
+        ref={modalRef}
         initial={{ scale: 0.96, opacity: 0, y: 16 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 16 }}
         transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white border border-[#E5DECD] w-full max-w-2xl max-h-[92vh] flex flex-col rounded-t-3xl sm:rounded-3xl card-shadow text-[#1F2A24] relative overflow-hidden"
+        className="bg-white border border-[#E5DECD] w-full max-w-2xl max-h-[90dvh] flex flex-col rounded-t-3xl sm:rounded-3xl card-shadow text-[#1F2A24] relative overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-label={`Autopsy of ${project.title}`}
@@ -589,7 +660,7 @@ function AutopsyView({
           </div>
           <button
             onClick={onClose}
-            className="text-2xl leading-none px-2 text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center text-2xl leading-none rounded-full text-[#4D5E53] hover:text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer shrink-0 transition-colors"
             aria-label="Close autopsy"
           >
             ×
@@ -650,6 +721,10 @@ function AutopsyView({
                   </div>
                 </div>
               ))}
+              <div className="flex justify-between items-center text-xs text-[#1F2A24] font-bold border-t border-[#E5DECD] pt-2.5 mt-3">
+                <span>Total Resurrection Score</span>
+                <span className="font-mono text-[#C8963E] text-sm">+{score} ({score}/100)</span>
+              </div>
               <p className="text-[11px] text-[#4D5E53] mt-2.5 leading-relaxed">
                 Formula: 50% idea strength + 30% completeness + 20% dormancy bonus (10 pts/month away, max 100 — distance gives fresh eyes).
               </p>
@@ -1150,7 +1225,7 @@ function TagFilterBar({ tags, selectedTag, onSelectTag, projectsCount }) {
       <span className="text-[#4D5E53] font-semibold text-[11px] mr-1 shrink-0">Tags:</span>
       <button
         onClick={() => onSelectTag('All')}
-        className={`px-3.5 py-1.5 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
+        className={`px-3.5 py-2 min-h-[44px] flex items-center rounded-full cursor-pointer transition-all shrink-0 font-medium ${
           selectedTag === 'All'
             ? 'bg-[#1F2A24] text-[#FAF6EE] font-bold shadow-xs'
             : 'bg-white border border-[#E5DECD] text-[#4D5E53] hover:text-[#1F2A24] hover:border-[#D6CEBC]'
@@ -1162,13 +1237,13 @@ function TagFilterBar({ tags, selectedTag, onSelectTag, projectsCount }) {
         <button
           key={t.name}
           onClick={() => onSelectTag(selectedTag === t.name ? 'All' : t.name)}
-          className={`px-3.5 py-1.5 rounded-full cursor-pointer transition-all shrink-0 font-medium ${
+          className={`px-3.5 py-2 min-h-[44px] flex items-center rounded-full cursor-pointer transition-all shrink-0 font-medium ${
             selectedTag === t.name
               ? 'bg-[#1F2A24] text-[#FAF6EE] font-bold shadow-xs'
               : 'bg-white border border-[#E5DECD] text-[#4D5E53] hover:text-[#1F2A24] hover:border-[#D6CEBC]'
           }`}
         >
-          {t.name} <span className="opacity-70 text-[10px]">({t.count})</span>
+          {t.name} <span className="opacity-70 text-[10px] ml-1">({t.count})</span>
         </button>
       ))}
     </div>
@@ -1282,6 +1357,7 @@ const EMPTY_FORM = {
 }
 
 function BuryForm({ onClose, onSave, onNotify }) {
+  const modalRef = useModalTrap({ isOpen: true, onClose })
   const [form, setForm] = useState(EMPTY_FORM)
   const [ghInput, setGhInput] = useState('')
   const [ghState, setGhState] = useState({ busy: false, msg: '' })
@@ -1296,9 +1372,34 @@ function BuryForm({ onClose, onSave, onNotify }) {
     setGhState({ busy: true, msg: '' })
     try {
       const res = await fetch(`https://api.github.com/repos/${parsed.owner}/${parsed.repo}`)
-      if (res.status === 404) throw new Error('Repo not found — it may be private or the name is wrong.')
-      if (res.status === 403) throw new Error('GitHub rate limit hit — try again in a few minutes, or fill the form manually.')
-      if (!res.ok) throw new Error(`GitHub returned ${res.status}. Fill the form manually instead.`)
+      if (res.status === 404) {
+        setGhState({ busy: false, msg: 'Repo not found or private' })
+        return
+      }
+      if (res.status === 403) {
+        setForm((f) => ({
+          ...f,
+          title: f.title || parsed.repo.replace(/[-_]/g, ' '),
+          repoUrl: f.repoUrl || `https://github.com/${parsed.owner}/${parsed.repo}`,
+        }))
+        setGhState({
+          busy: false,
+          msg: 'GitHub rate limit reached (60/hr). Project title prefilled — continue manually below.',
+        })
+        return
+      }
+      if (!res.ok) {
+        setForm((f) => ({
+          ...f,
+          title: f.title || parsed.repo.replace(/[-_]/g, ' '),
+          repoUrl: f.repoUrl || `https://github.com/${parsed.owner}/${parsed.repo}`,
+        }))
+        setGhState({
+          busy: false,
+          msg: `GitHub returned ${res.status}. Project title prefilled — continue manually below.`,
+        })
+        return
+      }
       const repo = await res.json()
       const tags = [repo.language, ...(repo.topics || [])].filter(Boolean)
       setForm((f) => ({
@@ -1315,8 +1416,16 @@ function BuryForm({ onClose, onSave, onNotify }) {
         msg: `✓ Filled from ${repo.full_name} — ⭐ ${repo.stargazers_count} · last push ${monthsSince(repo.pushed_at)} months ago. Now complete the autopsy below.`,
       })
       onNotify(`Fetched details from ${repo.full_name}`)
-    } catch (err) {
-      setGhState({ busy: false, msg: err.message || 'Could not reach GitHub. Fill the form manually instead.' })
+    } catch {
+      setForm((f) => ({
+        ...f,
+        title: f.title || parsed.repo.replace(/[-_]/g, ' '),
+        repoUrl: f.repoUrl || `https://github.com/${parsed.owner}/${parsed.repo}`,
+      }))
+      setGhState({
+        busy: false,
+        msg: 'Could not reach GitHub (network issue). Project title prefilled — continue manually below.',
+      })
     }
   }
 
@@ -1344,12 +1453,13 @@ function BuryForm({ onClose, onSave, onNotify }) {
       onClick={onClose}
     >
       <motion.div
+        ref={modalRef}
         initial={{ scale: 0.96, opacity: 0, y: 16 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 16 }}
         transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="modal-scrollbar bg-white border border-[#E5DECD] w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 card-shadow text-[#1F2A24]"
+        className="modal-scrollbar bg-white border border-[#E5DECD] w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-t-3xl sm:rounded-3xl p-6 sm:p-8 card-shadow text-[#1F2A24]"
         role="dialog"
         aria-modal="true"
         aria-label="Bury a project"
@@ -1361,7 +1471,7 @@ function BuryForm({ onClose, onSave, onNotify }) {
           </div>
           <button
             onClick={onClose}
-            className="text-2xl leading-none px-2 text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center text-2xl leading-none rounded-full text-[#4D5E53] hover:text-[#1F2A24] hover:bg-[#F3EEE2] cursor-pointer shrink-0 transition-colors"
             aria-label="Close form"
           >
             ×
@@ -1529,6 +1639,7 @@ function BuryForm({ onClose, onSave, onNotify }) {
 }
 
 function ConfirmDialog({ isOpen, title, message, confirmText = 'Confirm', confirmStyle = 'danger', onConfirm, onCancel }) {
+  const modalRef = useModalTrap({ isOpen, onClose: onCancel })
   if (!isOpen) return null
 
   return (
@@ -1540,6 +1651,7 @@ function ConfirmDialog({ isOpen, title, message, confirmText = 'Confirm', confir
       onClick={onCancel}
     >
       <motion.div
+        ref={modalRef}
         className="bg-white border border-[#E5DECD] rounded-[24px] p-6 sm:p-7 max-w-md w-full card-shadow text-[#1F2A24]"
         initial={{ scale: 0.96, opacity: 0, y: 16 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -1775,7 +1887,7 @@ export function AppContent() {
   const [statusFilter, setStatusFilter] = useState('All')
   const [selectedTag, setSelectedTag] = useState('All')
   const [sortBy, setSortBy] = useState('score')
-  const [toast, setToast] = useState(null)
+  const [toasts, setToasts] = useState([])
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false })
 
   const fileRef = useRef(null)
@@ -1833,15 +1945,12 @@ export function AppContent() {
     }
   }, [selectedId, showBury, confirmDialog.isOpen])
 
-  // Toast auto-dismiss after 3s
-  useEffect(() => {
-    if (!toast) return
-    const timer = setTimeout(() => setToast(null), 3000)
-    return () => clearTimeout(timer)
-  }, [toast])
-
   const notify = (message) => {
-    setToast({ id: Date.now(), message })
+    const id = Date.now() + Math.random()
+    setToasts((prev) => [...prev.slice(-1), { id, message }])
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3000)
   }
 
   const selected = projects.find((p) => p.id === selectedId) || null
@@ -1903,6 +2012,9 @@ export function AppContent() {
   const update = (id, fn) => setProjects((ps) => ps.map((p) => (p.id === id ? fn(p) : p)))
 
   const handleFate = (project, fate) => {
+    if (project.currentFate === fate || (fate === 'Archive' && project.status === 'Archived')) {
+      return
+    }
     const isArchive = fate === 'Archive'
     const status = isArchive ? 'Archived' : 'Resurrected'
     const newLog = {
@@ -1915,6 +2027,7 @@ export function AppContent() {
       return {
         ...p,
         status,
+        currentFate: fate,
         revivalPlan: plan,
         log: [...p.log, newLog],
       }
@@ -1935,25 +2048,39 @@ export function AppContent() {
   const handleUpdatePlan = async (project, newPlan) => {
     const progress = calculatePlanProgress(newPlan.tasks)
     let reachedCompletion = false
+    let wasUnchecked = false
 
     update(project.id, (p) => {
-      let nextStatus = p.status
       const logs = [...p.log]
 
       if (progress.allDone && p.status !== 'Revived') {
-        nextStatus = 'Revived'
         logs.push({ date: now(), text: 'All revival tasks completed — project Revived ✓!' })
         reachedCompletion = true
+        return {
+          ...p,
+          previousStatus: p.status,
+          previousFate: p.currentFate || (p.status === 'Resurrected' ? 'Continue' : ''),
+          status: 'Revived',
+          revivalPlan: newPlan,
+          log: logs,
+        }
       } else if (!progress.allDone && p.status === 'Revived') {
-        nextStatus = 'Resurrected'
-        logs.push({ date: now(), text: 'Revival reopened — tasks remaining.' })
+        wasUnchecked = true
+        const revertedStatus = p.previousStatus || 'Resurrected'
+        const revertedFate = p.previousFate || p.currentFate || 'Continue'
+        logs.push({ date: now(), text: `Revival reopened — status reverted to ${revertedStatus}.` })
+        return {
+          ...p,
+          status: revertedStatus,
+          currentFate: revertedFate,
+          revivalPlan: newPlan,
+          log: logs,
+        }
       }
 
       return {
         ...p,
-        status: nextStatus,
         revivalPlan: newPlan,
-        log: logs,
       }
     })
 
@@ -1970,6 +2097,8 @@ export function AppContent() {
         // dynamic import fallback
       }
       notify('🎉 All revival milestones finished! Project marked Revived ✓')
+    } else if (wasUnchecked) {
+      notify('Revival reopened — status reverted.')
     }
   }
 
@@ -2031,6 +2160,7 @@ export function AppContent() {
   }
 
   const handleSave = (form) => {
+    if (!form.title?.trim() || !form.vision?.trim() || !form.reason?.trim()) return
     const project = {
       id: `p-${Date.now()}`,
       title: form.title.trim(),
@@ -2044,6 +2174,7 @@ export function AppContent() {
       ideaStrength: Number(form.ideaStrength),
       monthsDormant: Number(form.monthsDormant),
       status: 'Dormant',
+      currentFate: '',
       adoptable: !!form.adoptable,
       repoUrl: form.repoUrl || '',
       adoptedBy: '',
@@ -2070,44 +2201,70 @@ export function AppContent() {
 
   const importJSON = (e) => {
     const file = e.target.files?.[0]
-    if (!file) return
+    if (!file) {
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
     const reader = new FileReader()
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result)
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed.every((p) => p.title && p.vision)) {
-          const clean = parsed.map((p, i) => ({
-            id: p.id || `imported-${Date.now()}-${i}`,
-            title: String(p.title).slice(0, 120),
-            epitaph: p.epitaph || 'Gone, but properly recorded.',
-            vision: String(p.vision),
-            built: Array.isArray(p.built) ? p.built : [],
-            unfinished: Array.isArray(p.unfinished) ? p.unfinished : [],
-            reason: p.reason || 'Not recorded.',
-            tags: Array.isArray(p.tags) ? p.tags : [],
-            completeness: Math.min(100, Math.max(0, Number(p.completeness) || 0)),
-            ideaStrength: Math.min(100, Math.max(0, Number(p.ideaStrength) || 0)),
-            monthsDormant: Math.min(60, Math.max(0, Number(p.monthsDormant) || 0)),
-            status: ['Dormant', 'Resurrected', 'Revived', 'Archived', 'Adopted'].includes(p.status) ? p.status : 'Dormant',
-            adoptable: !!p.adoptable,
-            repoUrl: p.repoUrl || '',
-            adoptedBy: p.adoptedBy || '',
-            createdAt: p.createdAt || now(),
-            log: Array.isArray(p.log) ? p.log : [{ date: now(), text: 'Imported into this graveyard.' }],
-            revivalPlan: p.revivalPlan && Array.isArray(p.revivalPlan.tasks) ? p.revivalPlan : null,
-          }))
-          setProjects(clean)
-          setSelectedId(null)
-          notify('Graveyard data imported successfully.')
-        } else {
+        const rawList = Array.isArray(parsed)
+          ? parsed
+          : (parsed && typeof parsed === 'object' && Array.isArray(parsed.projects))
+            ? parsed.projects
+            : null
+
+        if (!rawList || rawList.length === 0) {
           notify('Invalid file format. Could not import.')
+          return
         }
+
+        const isValid = rawList.every(
+          (p) => p && typeof p === 'object' && typeof p.title === 'string' && p.title.trim()
+        )
+
+        if (!isValid) {
+          notify('Invalid project data: missing required title or fields.')
+          return
+        }
+
+        const clean = rawList.map((p, i) => ({
+          id: typeof p.id === 'string' && p.id ? p.id : `imported-${Date.now()}-${i}`,
+          title: String(p.title).trim().slice(0, 120),
+          epitaph: typeof p.epitaph === 'string' && p.epitaph ? p.epitaph : 'Gone, but properly recorded.',
+          vision: typeof p.vision === 'string' ? p.vision.trim() : '',
+          built: Array.isArray(p.built) ? p.built.map(String) : [],
+          unfinished: Array.isArray(p.unfinished) ? p.unfinished.map(String) : [],
+          reason: typeof p.reason === 'string' && p.reason ? p.reason : 'Not recorded.',
+          tags: Array.isArray(p.tags) ? p.tags.map(String) : [],
+          completeness: Math.min(100, Math.max(0, Number(p.completeness) || 0)),
+          ideaStrength: Math.min(100, Math.max(0, Number(p.ideaStrength) || 0)),
+          monthsDormant: Math.min(60, Math.max(0, Number(p.monthsDormant) || 0)),
+          status: ['Dormant', 'Resurrected', 'Revived', 'Archived', 'Adopted'].includes(p.status) ? p.status : 'Dormant',
+          currentFate: typeof p.currentFate === 'string' ? p.currentFate : '',
+          adoptable: !!p.adoptable,
+          repoUrl: typeof p.repoUrl === 'string' ? p.repoUrl : '',
+          adoptedBy: typeof p.adoptedBy === 'string' ? p.adoptedBy : '',
+          createdAt: typeof p.createdAt === 'string' && p.createdAt ? p.createdAt : now(),
+          log: Array.isArray(p.log) && p.log.length > 0 ? p.log : [{ date: now(), text: 'Imported into this graveyard.' }],
+          revivalPlan: p.revivalPlan && Array.isArray(p.revivalPlan.tasks) ? p.revivalPlan : null,
+        }))
+
+        setProjects(clean)
+        setSelectedId(null)
+        notify('Graveyard data imported successfully.')
       } catch {
         notify('Could not read file as JSON.')
+      } finally {
+        if (fileRef.current) fileRef.current.value = ''
       }
     }
+    reader.onerror = () => {
+      notify('Could not read file.')
+      if (fileRef.current) fileRef.current.value = ''
+    }
     reader.readAsText(file)
-    e.target.value = ''
   }
 
   return (
@@ -2283,9 +2440,9 @@ export function AppContent() {
                 </div>
 
                 <div>
-                  <h3 className="font-display text-xl sm:text-2xl font-bold text-[#1F2A24]">
+                  <h2 className="font-display text-xl sm:text-2xl font-bold text-[#1F2A24]">
                     Revival Radar
-                  </h3>
+                  </h2>
                   <p className="text-sm font-semibold text-[#1F2A24] mt-0.5">
                     {radar.title} — highest chance of revival
                   </p>
@@ -2371,11 +2528,13 @@ export function AppContent() {
             <div className="w-16 h-16 rounded-full bg-[#F7ECD2] flex items-center justify-center mx-auto text-3xl mb-4">
               🪦
             </div>
-            <h2 className="font-display text-2xl font-bold text-[#1F2A24]">Quiet for now</h2>
+            <h2 className="font-display text-2xl font-bold text-[#1F2A24]">
+              {projects.length === 0 ? 'Quiet for now' : 'No graves match'}
+            </h2>
             <p className="text-[#4D5E53] text-sm mt-2 leading-relaxed">
               {projects.length === 0
                 ? 'No graves yet in the cemetery. Bury your first unfinished build and give it a chance to rise again.'
-                : 'No projects match your search, tag, or status filter. Reset your filters to explore all graves.'}
+                : 'No projects match your search, tag, or status filter. Clear all filters to explore all graves.'}
             </p>
             <div className="flex justify-center gap-2 mt-5">
               {(query || statusFilter !== 'All' || selectedTag !== 'All') && (
@@ -2387,7 +2546,7 @@ export function AppContent() {
                   }}
                   className="border border-[#E5DECD] bg-white px-4 py-2 rounded-full text-xs font-semibold text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
                 >
-                  Reset filters
+                  Clear all filters
                 </button>
               )}
               <button
@@ -2483,24 +2642,26 @@ export function AppContent() {
         )}
       </AnimatePresence>
 
-      {/* Fixed Bottom-Center Toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key={toast.id}
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#FAF6EE] border border-[#E5DECD] text-[#1F2A24] px-5 py-3 rounded-full card-shadow flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-lg"
-          >
-            <div className="w-5 h-5 rounded-full bg-[#16A06B] flex items-center justify-center text-white text-[11px] font-bold">
-              <Check className="w-3.5 h-3.5" />
-            </div>
-            <span>{toast.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Fixed Bottom-Center Toasts (Max 2 visible, z-50 above sticky header) */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 24, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-[#FAF6EE] border border-[#E5DECD] text-[#1F2A24] px-5 py-3 rounded-full card-shadow flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-lg pointer-events-auto"
+            >
+              <div className="w-5 h-5 rounded-full bg-[#16A06B] flex items-center justify-center text-white text-[11px] font-bold shrink-0">
+                <Check className="w-3.5 h-3.5" />
+              </div>
+              <span>{t.message}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

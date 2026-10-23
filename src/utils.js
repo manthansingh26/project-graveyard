@@ -2,12 +2,16 @@
 import { resurrectionScore } from './score.js'
 
 export function parseGitHubRepo(input) {
-  const s = (input || '').trim().replace(/\.git$/, '').replace(/\/$/, '')
-  const urlMatch = s.match(/github\.com\/([^/\s]+)\/([^/\s]+)/)
-  if (urlMatch) return { owner: urlMatch[1], repo: urlMatch[2] }
-  const shortMatch = s.match(/^([^/\s]+)\/([^/\s]+)$/)
-  if (shortMatch) return { owner: shortMatch[1], repo: shortMatch[2] }
-  return null
+  if (!input) return null
+  let s = String(input).trim()
+  s = s.replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+  s = s.replace(/^github\.com\//i, '')
+  const match = s.match(/^([^/\s]+)\/([^/\s?#]+)/)
+  if (!match) return null
+  const owner = match[1]
+  const repo = match[2].replace(/\.git$/i, '')
+  if (!owner || !repo) return null
+  return { owner, repo }
 }
 
 export function monthsSince(dateStr, nowMs = Date.now()) {

@@ -2894,8 +2894,9 @@ export function AppContent() {
                     setSelectedTag('All')
                   }}
                   className="border border-[#E5DECD] bg-white px-4 py-2 rounded-full text-xs font-semibold text-[#4D5E53] hover:text-[#1F2A24] cursor-pointer"
+                  aria-label="Clear filters"
                 >
-                  Clear all filters
+                  Clear filters
                 </button>
               )}
               <button
